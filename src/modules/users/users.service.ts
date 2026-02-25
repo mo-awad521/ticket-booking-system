@@ -23,7 +23,7 @@ export class UsersService {
     return this.userRepo.findOne({ where: { id } });
   }
 
-  async activateUser(id: string) {
-    await this.userRepo.update(id, { isActive: true });
-  }
+  // async activateUser(id: string) {
+  //   await this.userRepo.update(id, { isActive: true });
+  // }
 }

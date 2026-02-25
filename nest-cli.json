@@ -1,8 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "src/modules",
+  "sourceRoot": "src",
   "compilerOptions": {
+    "assets": ["modules/notifications/templates/**/*"],
     "deleteOutDir": true
   }
 }
