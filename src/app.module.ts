@@ -6,6 +6,11 @@ import { AppService } from './app.service';
 import { dataSourceOptions } from './database/data-source';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { EventsModule } from './modules/events/events.module';
+import { TicketTypesModule } from './modules/ticket-types/ticket-types.module';
+import { MediaModule } from './modules/media/media.module';
+import { ReservationsModule } from './modules/reservations/reservations.module';
 
 @Module({
   imports: [
@@ -15,6 +20,11 @@ import { AuthModule } from './modules/auth/auth.module';
     TypeOrmModule.forRoot(dataSourceOptions),
     UsersModule,
     AuthModule,
+    NotificationsModule,
+    EventsModule,
+    TicketTypesModule,
+    MediaModule,
+    ReservationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
