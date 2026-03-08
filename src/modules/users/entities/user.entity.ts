@@ -3,6 +3,7 @@ import { BaseEntity } from '../../../common/entities/base.entity';
 import { UserRole } from '../../../common/enums/user-role.enum';
 import { UserVerificationToken } from '../../auth/entities/user-verification-token.entity';
 import { AccountStatus } from '../enums/account-status.enum';
+import { Event } from '../../events/entities/event.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -34,4 +35,7 @@ export class User extends BaseEntity {
 
   @Column({ default: false })
   isEmailVerified: boolean;
+
+  @OneToMany(() => Event, (event) => event.organizer)
+  organizedEvents: Event[];
 }
