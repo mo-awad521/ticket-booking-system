@@ -4,6 +4,7 @@ import { UserRole } from '../../../common/enums/user-role.enum';
 import { UserVerificationToken } from '../../auth/entities/user-verification-token.entity';
 import { AccountStatus } from '../enums/account-status.enum';
 import { Event } from '../../events/entities/event.entity';
+import { Reservation } from '../../reservations/entities/reservation.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -38,4 +39,7 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Event, (event) => event.organizer)
   organizedEvents: Event[];
+
+  @OneToMany(() => Reservation, (reservation: Reservation) => reservation.user)
+  reservations: Reservation[];
 }

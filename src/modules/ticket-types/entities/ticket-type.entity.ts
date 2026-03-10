@@ -1,6 +1,15 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index, Check } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  Index,
+  Check,
+  OneToMany,
+} from 'typeorm';
 import { Event } from '../../events/entities/event.entity';
 import { BaseEntity } from '../../../common/entities/base.entity';
+import { ReservationItem } from '../../reservations/entities/reservation-item.entity';
 
 export const enum TicketCategory {
   VIP = 'VIP',
@@ -66,6 +75,9 @@ export class TicketType extends BaseEntity {
 
   @Column({ name: 'event_id' })
   eventId: string;
+
+  @OneToMany(() => ReservationItem, (item: ReservationItem) => item.ticketType)
+  reservationItems: ReservationItem[];
 
   /* -------------------------------------------------------------------------- */
   /*                             DOMAIN HELPERS                                 */
