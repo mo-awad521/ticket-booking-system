@@ -11,6 +11,9 @@ import { EventsModule } from './modules/events/events.module';
 import { TicketTypesModule } from './modules/ticket-types/ticket-types.module';
 import { MediaModule } from './modules/media/media.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -18,6 +21,7 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
       isGlobal: true,
     }),
     TypeOrmModule.forRoot(dataSourceOptions),
+    ScheduleModule.forRoot(),
     UsersModule,
     AuthModule,
     NotificationsModule,
@@ -25,6 +29,8 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
     TicketTypesModule,
     MediaModule,
     ReservationsModule,
+    OrdersModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
