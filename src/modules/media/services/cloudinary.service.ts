@@ -68,6 +68,28 @@ export class CloudinaryService {
     return results;
   }
 
+  async uploadBase64Image(
+    base64: string,
+    folder = 'tickets',
+    publicId?: string,
+  ): Promise<{ url: string; publicId: string }> {
+    try {
+      const result = await cloudinary.uploader.upload(base64, {
+        folder,
+        resource_type: 'image',
+        public_id: publicId, // هنا يضاف
+      });
+
+      return {
+        url: result.secure_url,
+        publicId: result.public_id,
+      };
+    } catch (err) {
+      console.error('Cloudinary base64 upload failed:', err);
+      throw new BadRequestException('Cloudinary upload failed');
+    }
+  }
+
   async deleteImage(publicId: string): Promise<boolean> {
     try {
       const res = (await cloudinary.uploader.destroy(publicId, {
