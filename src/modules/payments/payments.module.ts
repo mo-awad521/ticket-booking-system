@@ -6,9 +6,14 @@ import { PaymentsService } from './payments.service';
 import { MockPaymentProvider } from './providers/mock-payment.provider';
 import { Payment } from './entities/payment.entity';
 import { Order } from '../orders/entities/order.entity';
+import { TicketsModule } from '../tickets/tickets.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Payment, Order]), ConfigModule],
+  imports: [
+    TypeOrmModule.forFeature([Payment, Order]),
+    ConfigModule,
+    TicketsModule,
+  ],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,
