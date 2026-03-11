@@ -14,6 +14,7 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     ReservationsModule,
     OrdersModule,
     PaymentsModule,
+    TicketsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
