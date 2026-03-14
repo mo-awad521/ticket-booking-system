@@ -7,13 +7,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 
-import { Event, EventStatus } from './entities/event.entity';
-import { CreateEventDto } from './dtos/create-event.dto';
-import { UpdateEventDto } from './dtos/update-event.dto';
-import { QueryEventsDto } from './dtos/query-event.dto';
-import { OrganizerEventsQueryDto } from './dtos/organizer-events-query.dto';
-import { CloudinaryService } from '../media/services/cloudinary.service';
-import { EventResponseDto } from './dtos/evnet.response.dto';
+import { Event, EventStatus } from '../entities/event.entity';
+import { CreateEventDto } from '../dtos/create-event.dto';
+import { UpdateEventDto } from '../dtos/update-event.dto';
+import { QueryEventsDto } from '../dtos/query-event.dto';
+import { OrganizerEventsQueryDto } from '../dtos/organizer-events-query.dto';
+import { CloudinaryService } from '../../media/services/cloudinary.service';
+import { EventResponseDto } from '../dtos/evnet.response.dto';
 
 @Injectable()
 export class EventsService {
