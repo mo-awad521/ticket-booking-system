@@ -1,7 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { TicketsService, GetMyTicketsQueryDto } from './tickets.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { TicketsService, GetMyTicketsQueryDto } from '../tickets.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('tickets')

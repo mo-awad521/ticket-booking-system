@@ -5,18 +5,23 @@ import {
 } from '@nestjs/common';
 import * as QRCode from 'qrcode';
 import { CloudinaryService } from 'src/modules/media/services/cloudinary.service';
+import { TicketSignatureService } from './ticket-signature.service';
 
 @Injectable()
 export class QrCodeService {
   private readonly logger = new Logger(QrCodeService.name);
 
-  constructor(private readonly cloudinaryService: CloudinaryService) {}
+  constructor(
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly signatureService: TicketSignatureService,
+  ) {}
 
   async generateQr(ticketCode: string): Promise<string> {
-    let qrBase64: string;
+    const qrPayload = this.signatureService.buildPayload(ticketCode);
 
+    let qrBase64: string;
     try {
-      qrBase64 = await QRCode.toDataURL(ticketCode, {
+      qrBase64 = await QRCode.toDataURL(qrPayload, {
         errorCorrectionLevel: 'H',
         margin: 2,
         width: 300,
@@ -32,7 +37,6 @@ export class QrCodeService {
         'tickets',
         `ticket-${ticketCode}`,
       );
-
       return uploaded.url;
     } catch (err) {
       this.logger.error(
