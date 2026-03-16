@@ -5,10 +5,15 @@ import {
   Logger,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Ticket } from '../entities/ticket.entity';
 import { TicketStatus } from '../enums/ticket-status.enum';
 import { TicketSignatureService } from './ticket-signature.service';
 import { ScanTicketResponseDto } from '../dtos/scan-ticket-response.dto';
+import {
+  TICKET_CHECKED_IN_EVENT,
+  TicketCheckedInEvent,
+} from '../events/ticket-checked-in.event';
 import { EventStaffAssignment } from 'src/modules/events/entities/event-staff-assignment.entity';
 
 @Injectable()
@@ -18,6 +23,8 @@ export class TicketValidationService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly signatureService: TicketSignatureService,
+
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async validateTicket(
@@ -51,7 +58,7 @@ export class TicketValidationService {
       throw new BadRequestException('Invalid ticket signature');
     }
 
-    return this.dataSource.transaction(async (trx) => {
+    const checkedInTicket = await this.dataSource.transaction(async (trx) => {
       const ticketRepo = trx.getRepository(Ticket);
 
       const ticket = await ticketRepo.findOne({
@@ -87,7 +94,18 @@ export class TicketValidationService {
         `Ticket ${ticket.id} checked in by staff ${staffId} at event ${eventId}`,
       );
 
-      return new ScanTicketResponseDto(ticket);
+      return ticket;
     });
+
+    const event: TicketCheckedInEvent = {
+      eventId: checkedInTicket.eventId,
+      ticketId: checkedInTicket.id,
+      staffId,
+      usedAt: checkedInTicket.usedAt!,
+    };
+
+    this.eventEmitter.emit(TICKET_CHECKED_IN_EVENT, event);
+
+    return new ScanTicketResponseDto(checkedInTicket);
   }
 }

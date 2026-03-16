@@ -15,6 +15,8 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { TicketsModule } from './modules/tickets/tickets.module';
     }),
     TypeOrmModule.forRoot(dataSourceOptions),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     UsersModule,
     AuthModule,
     NotificationsModule,
@@ -33,6 +36,7 @@ import { TicketsModule } from './modules/tickets/tickets.module';
     OrdersModule,
     PaymentsModule,
     TicketsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
