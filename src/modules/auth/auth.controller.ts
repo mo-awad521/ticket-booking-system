@@ -1,103 +1,117 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-
-// services
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
-
-// dtos
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { ResendVerificationDto } from './dto/resend-verification.dto';
-
-// Guards
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { RegisterDto } from './dto/register.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  //===============================================
-  //     Register
-  //===============================================
+  // POST /auth/register
   @Post('register')
-  async register(@Body() dto: RegisterDto) {
+  register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
-  //===============================================
-  //     Verify Email
-  //===============================================
+  // GET /auth/verify-email?token=...
   @Get('verify-email')
-  async verifyEmail(@Query('token') token: string) {
+  verifyEmail(@Query('token') token: string) {
     return this.authService.verifyEmail(token);
   }
 
-  //===============================================
-  //     Resend Verification Token
-  //===============================================
+  // POST /auth/resend-verification
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ strict: { limit: 3, ttl: 3_600_000 } })
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
-  async resendVerification(@Body() dto: ResendVerificationDto) {
+  resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerification(dto);
   }
 
-  //===============================================
-  //     Login
-  //===============================================
+  // POST /auth/login
   @UseGuards(ThrottlerGuard)
-  @Throttle({ auth: { limit: 3, ttl: 60000 } })
+  @Throttle({ auth: { limit: 5, ttl: 60_000 } })
   @Post('login')
-  async login(@Body() dto: LoginDto, @Req() req: Request) {
+  login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto, req);
   }
 
-  //===============================================
-  //     Refresh Token
-  //===============================================
+  // POST /auth/refresh
   @Post('refresh')
-  async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
+  refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
     return this.authService.refresh(dto, req);
   }
 
-  //===============================================
-  //     Forgot password
-  //===============================================
+  // POST /auth/forgot-password
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ strict: { limit: 3, ttl: 3_600_000 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
 
-  //===============================================
-  //     Reset Password
-  //===============================================
+  // POST /auth/reset-password
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  async resetPassword(@Body() dto: ResetPasswordDto) {
+  resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
 
-  //===============================================
-  //     Logout
-  //===============================================
+  // POST /auth/logout
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  async logout(@Body('refreshToken') refreshToken: string) {
-    await this.authService.logout(refreshToken);
+  @HttpCode(HttpStatus.OK)
+  async logout(@Body() dto: RefreshTokenDto) {
+    await this.authService.logout(dto.refreshToken);
     return { message: 'Logged out successfully' };
+  }
+
+  // POST /auth/logout-all
+  @UseGuards(JwtAuthGuard)
+  @Post('logout-all')
+  @HttpCode(HttpStatus.OK)
+  async logoutAll(@CurrentUser('id') userId: string) {
+    await this.authService.logoutAll(userId);
+    return { message: 'Logged out from all devices successfully' };
+  }
+
+  // GET /auth/sessions 
+  @UseGuards(JwtAuthGuard)
+  @Get('sessions')
+  getSessions(@CurrentUser('id') userId: string) {
+    return this.authService.getSessions(userId);
+  }
+
+  // DELETE /auth/sessions/:id
+  @UseGuards(JwtAuthGuard)
+  @Delete('sessions/:id')
+  @HttpCode(HttpStatus.OK)
+  revokeSession(
+    @Param('id', ParseUUIDPipe) tokenId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.authService.revokeSession(tokenId, userId);
   }
 }

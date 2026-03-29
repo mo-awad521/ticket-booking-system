@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, Index } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { VerificationTokenType } from '../enums/verification-token.enum';
@@ -10,6 +10,7 @@ export class UserVerificationToken extends BaseEntity {
   })
   user: User;
 
+  @Index()
   @Column()
   tokenHash: string;
 
@@ -22,6 +23,6 @@ export class UserVerificationToken extends BaseEntity {
   @Column()
   expiresAt: Date;
 
-  @Column({ nullable: true })
-  usedAt: Date;
+  @Column({ name: 'used_at', type: 'timestamp', nullable: true })
+  usedAt: Date | null;
 }

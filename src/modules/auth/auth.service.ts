@@ -1,13 +1,13 @@
 import {
-  Injectable,
-  UnauthorizedException,
-  ForbiddenException,
-  ConflictException,
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { Repository, DataSource, LessThan, IsNull } from 'typeorm';
+import { DataSource, IsNull, LessThan, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -15,99 +15,93 @@ import { Request } from 'express';
 
 // entities
 import { User } from '../users/entities/user.entity';
-import { RefreshToken } from './entities/refresh-token.entity';
 import { UserVerificationToken } from './entities/user-verification-token.entity';
 
 // services
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../notifications/email.service';
-import { TokenService } from './services/token.service';
+import { TokenService, SessionInfo } from './services/token.service';
 
 // dtos
-import { RegisterDto } from './dto/register.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { RegisterDto } from './dto/register.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
-// enums
+// enums + interfaces
 import { UserRole } from '../../common/enums/user-role.enum';
 import { AccountStatus } from '../users/enums/account-status.enum';
 import { VerificationTokenType } from './enums/verification-token.enum';
-
-// interfaces
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
-    @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
-    @InjectRepository(RefreshToken)
-    private readonly refreshTokenRepo: Repository<RefreshToken>,
     @InjectRepository(UserVerificationToken)
     private readonly verificationRepo: Repository<UserVerificationToken>,
+
+    private readonly usersService: UsersService,
     private readonly emailService: EmailService,
     private readonly tokenService: TokenService,
-    private readonly usersService: UsersService,
-    private dataSource: DataSource,
+    private readonly dataSource: DataSource,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-  async cleanupExpiredTokens() {
-    await this.refreshTokenRepo.delete({
-      expiresAt: LessThan(new Date()),
-    });
+  // ── Cron: Cleanup ─────────────────────────────────────────────────────────
 
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async cleanupExpiredTokens(): Promise<void> {
+    await this.tokenService.deleteExpiredTokens();
     await this.verificationRepo.delete({
       expiresAt: LessThan(new Date()),
     });
+    this.logger.log('Expired tokens cleaned up');
   }
 
-  //===============================================
-  //     Register
-  //===============================================
-  async register(dto: RegisterDto) {
-    const existingUser = await this.usersRepository.findOne({
-      where: { email: dto.email },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('Email already in use');
-    }
-
+  // ── Register ──────────────────────────────────────────────────────────────
+  async register(dto: RegisterDto): Promise<{ message: string }> {
     const rawToken = crypto.randomBytes(32).toString('hex');
-
+    const tokenHash = this.hashToken(rawToken);
     const hashedPassword = await bcrypt.hash(dto.password, 12);
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
 
-    const createdUser = await this.dataSource.transaction(async (manager) => {
-      const user = manager.create(User, {
-        email: dto.email,
-        password: hashedPassword,
-        name: dto.name,
-        role: UserRole.USER,
-        accountStatus: AccountStatus.PENDING_VERIFICATION,
+    let createdUser: User;
+
+    try {
+      createdUser = await this.dataSource.transaction(async (manager) => {
+        const userEntity = manager.create(User, {
+          email: dto.email,
+          password: hashedPassword,
+          name: dto.name,
+          role: UserRole.USER,
+          accountStatus: AccountStatus.PENDING_VERIFICATION,
+        });
+
+        const savedUser = await manager.save(userEntity);
+
+        await manager.save(
+          manager.create(UserVerificationToken, {
+            user: savedUser,
+            tokenHash,
+            type: VerificationTokenType.EMAIL_VERIFICATION,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          }),
+        );
+
+        return savedUser;
       });
-
-      const savedUser = await manager.save(user);
-
-      const verificationToken = manager.create(UserVerificationToken, {
-        user: savedUser,
-        tokenHash,
-        type: VerificationTokenType.EMAIL_VERIFICATION,
-        expiresAt: new Date(
-          Date.now() + 1000 * 60 * 60 * 24, // 24 hours
-        ),
-      });
-
-      await manager.save(verificationToken);
-
-      return savedUser;
-    });
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ER_DUP_ENTRY'
+      ) {
+        throw new ConflictException('Email already in use');
+      }
+      throw error;
+    }
 
     try {
       await this.emailService.sendVerificationEmail(
@@ -115,10 +109,11 @@ export class AuthService {
         createdUser.name,
         rawToken,
       );
-    } catch (error) {
-      console.log(`
-        Failed to send verification email to ${createdUser.email},
-        ${error}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to send verification email to ${createdUser.email}: ${msg}`,
+      );
     }
 
     return {
@@ -126,20 +121,14 @@ export class AuthService {
         'Registration successful. Please check your email to verify your account.',
     };
   }
+  // ── Verify Email ──────────────────────────────────────────────────────────
 
-  //===============================================
-  //     Verify Email
-  //===============================================
-  async verifyEmail(rawToken: string) {
-    if (!rawToken) {
-      throw new BadRequestException('Invalid verification token');
+  async verifyEmail(rawToken: string): Promise<{ message: string }> {
+    if (!rawToken?.trim()) {
+      throw new BadRequestException('Verification token is required');
     }
 
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
-
+    const tokenHash = this.hashToken(rawToken);
     const token = await this.verificationRepo.findOne({
       where: {
         tokenHash,
@@ -149,12 +138,8 @@ export class AuthService {
       relations: ['user'],
     });
 
-    if (!token) {
-      throw new BadRequestException('Invalid or expired token');
-    }
-
-    if (token.expiresAt < new Date()) {
-      throw new BadRequestException('Verification token expired');
+    if (!token || token.expiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired verification token');
     }
 
     if (token.user.accountStatus === AccountStatus.ACTIVE) {
@@ -164,35 +149,28 @@ export class AuthService {
     await this.dataSource.transaction(async (manager) => {
       token.usedAt = new Date();
       token.user.accountStatus = AccountStatus.ACTIVE;
-
+      token.user.isEmailVerified = true;
       await manager.save(token.user);
       await manager.save(token);
     });
 
-    return {
-      message: 'Email verified successfully. You can now log in.',
-    };
+    return { message: 'Email verified successfully. You can now log in.' };
   }
 
-  async resendVerification(dto: ResendVerificationDto) {
-    const user = await this.usersRepository.findOne({
-      where: { email: dto.email },
-    });
+  // ── Resend Verification ───────────────────────────────────────────────────
 
-    if (!user) {
-      return {
-        message:
-          'If the account exists and is not verified, a verification email has been sent.',
-      };
+  async resendVerification(
+    dto: ResendVerificationDto,
+  ): Promise<{ message: string }> {
+    const GENERIC =
+      'If the account exists and is not verified, a verification email has been sent.';
+
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user || user.accountStatus === AccountStatus.ACTIVE) {
+      return { message: GENERIC };
     }
 
-    if (user.accountStatus === AccountStatus.ACTIVE) {
-      return {
-        message:
-          'If the account exists and is not verified, a verification email has been sent.',
-      };
-    }
-
+    // إلغاء الـ tokens القديمة
     await this.verificationRepo.update(
       {
         user: { id: user.id },
@@ -203,18 +181,14 @@ export class AuthService {
     );
 
     const rawToken = crypto.randomBytes(32).toString('hex');
-
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
+    const tokenHash = this.hashToken(rawToken);
 
     await this.verificationRepo.save(
       this.verificationRepo.create({
         user,
         tokenHash,
         type: VerificationTokenType.EMAIL_VERIFICATION,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24h
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       }),
     );
 
@@ -223,62 +197,26 @@ export class AuthService {
       user.name,
       rawToken,
     );
-
-    return {
-      message:
-        'If the account exists and is not verified, a verification email has been sent.',
-    };
+    return { message: GENERIC };
   }
 
-  //===============================================
-  //     --- priavate store refresh token
-  //===============================================
-  private async storeRefreshToken(
-    user: User,
-    refreshToken: string,
-    req?: Request,
-  ) {
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(refreshToken)
-      .digest('hex');
+  // ── Login ─────────────────────────────────────────────────────────────────
 
-    const rawUA = req?.headers['user-agent'];
-
-    const userAgent = Array.isArray(rawUA)
-      ? String(rawUA[0] ?? 'unknown')
-      : (rawUA ?? 'unknown');
-
-    const entity = this.refreshTokenRepo.create({
-      user,
-      tokenHash,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      isRevoked: false,
-      ipAddress: req?.ip ?? 'unknown',
-      userAgent,
-    });
-
-    await this.refreshTokenRepo.save(entity);
-  }
-
-  //===============================================
-  //     Login
-  //===============================================
-  async login(dto: LoginDto, req: Request) {
-    const user = await this.usersRepository.findOne({
-      where: { email: dto.email },
-      select: ['id', 'email', 'password', 'name', 'role', 'accountStatus'],
-    });
+  async login(
+    dto: LoginDto,
+    req: Request,
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: { id: string; email: string; name: string; role: UserRole };
+  }> {
+    const user = await this.usersService.findByEmailWithPassword(dto.email);
 
     if (!user || !(await bcrypt.compare(dto.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.accountStatus !== AccountStatus.ACTIVE) {
-      throw new ForbiddenException(
-        'Please verify your email before logging in',
-      );
-    }
+    this.assertAccountActive(user.accountStatus);
 
     const payload: JwtPayload = {
       sub: user.id,
@@ -289,7 +227,7 @@ export class AuthService {
     const { accessToken, refreshToken } =
       await this.tokenService.generateAuthTokens(payload);
 
-    await this.storeRefreshToken(user, refreshToken, req);
+    await this.tokenService.storeRefreshToken(user, refreshToken, req);
 
     return {
       accessToken,
@@ -303,10 +241,12 @@ export class AuthService {
     };
   }
 
-  //===============================================
-  //     Refresh Token
-  //===============================================
-  async refresh(dto: RefreshTokenDto, req: Request) {
+  // ── Refresh Token ─────────────────────────────────────────────────────────
+
+  async refresh(
+    dto: RefreshTokenDto,
+    req: Request,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     let decoded: JwtPayload;
 
     try {
@@ -315,34 +255,22 @@ export class AuthService {
       throw new ForbiddenException('Invalid or expired refresh token');
     }
 
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(dto.refreshToken)
-      .digest('hex');
-
-    const matchedToken = await this.refreshTokenRepo.findOne({
-      where: {
-        tokenHash,
-        isRevoked: false,
-        user: { id: decoded.sub },
-      },
-      relations: ['user'],
-    });
+    const matchedToken = await this.tokenService.findValidToken(
+      dto.refreshToken,
+      decoded.sub,
+    );
 
     if (!matchedToken) {
-      await this.refreshTokenRepo.update(
-        { user: { id: decoded.sub } },
-        { isRevoked: true },
+      await this.tokenService.revokeAllSessions(decoded.sub);
+      this.logger.warn(
+        `Refresh token reuse detected for user ${decoded.sub} — all sessions revoked`,
       );
-
-      throw new ForbiddenException('Refresh token reuse detected');
+      throw new ForbiddenException(
+        'Refresh token reuse detected. Please log in again.',
+      );
     }
 
-    // Rotation
-    await this.refreshTokenRepo.update(
-      { id: matchedToken.id },
-      { isRevoked: true },
-    );
+    await this.tokenService.revokeToken(matchedToken.id);
 
     const payload: JwtPayload = {
       sub: matchedToken.user.id,
@@ -353,40 +281,34 @@ export class AuthService {
     const { accessToken, refreshToken } =
       await this.tokenService.generateAuthTokens(payload);
 
-    await this.storeRefreshToken(matchedToken.user, refreshToken, req);
+    await this.tokenService.storeRefreshToken(
+      matchedToken.user,
+      refreshToken,
+      req,
+    );
 
     return { accessToken, refreshToken };
   }
 
-  //===============================================
-  //     Forgot Password
-  //===============================================
-  async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.usersRepository.findOne({
-      where: { email: dto.email },
-    });
+  // ── Forgot Password ───────────────────────────────────────────────────────
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const GENERIC = 'If the email exists, a reset link has been sent.';
+    const user = await this.usersService.findByEmail(dto.email);
 
     if (!user || user.accountStatus !== AccountStatus.ACTIVE) {
-      return {
-        message: 'If the email exists, a reset link has been sent.',
-      };
+      return { message: GENERIC };
     }
 
     const rawToken = crypto.randomBytes(32).toString('hex');
-
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
-
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+    const tokenHash = this.hashToken(rawToken);
 
     await this.verificationRepo.save(
       this.verificationRepo.create({
         user,
         tokenHash,
         type: VerificationTokenType.PASSWORD_RESET,
-        expiresAt,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1h
       }),
     );
 
@@ -395,21 +317,13 @@ export class AuthService {
       user.name,
       rawToken,
     );
-
-    return {
-      message: 'If the email exists, a reset link has been sent.',
-    };
+    return { message: GENERIC };
   }
 
-  //===============================================
-  //     Reset Password
-  //===============================================
-  async resetPassword(dto: ResetPasswordDto) {
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(dto.token)
-      .digest('hex');
+  // ── Reset Password ────────────────────────────────────────────────────────
 
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const tokenHash = this.hashToken(dto.token);
     const token = await this.verificationRepo.findOne({
       where: {
         tokenHash,
@@ -419,52 +333,78 @@ export class AuthService {
       relations: ['user'],
     });
 
-    if (!token) {
-      throw new BadRequestException('Invalid or expired token');
-    }
-
-    if (token.expiresAt < new Date()) {
-      throw new BadRequestException('Reset token expired');
+    if (!token || token.expiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired reset token');
     }
 
     await this.dataSource.transaction(async (manager) => {
       token.user.password = await bcrypt.hash(dto.newPassword, 12);
-      await manager.save(token.user);
-
       token.usedAt = new Date();
+      await manager.save(token.user);
       await manager.save(token);
-
-      await manager.update(
-        RefreshToken,
-        { user: { id: token.user.id } },
-        { isRevoked: true },
-      );
     });
 
-    return {
-      message: 'Password reset successful. Please log in again.',
-    };
+    await this.tokenService.revokeAllSessions(token.user.id);
+
+    return { message: 'Password reset successful. Please log in again.' };
   }
 
-  //===============================================
-  //     Logout
-  //===============================================
-  async logout(refreshToken: string) {
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(refreshToken)
-      .digest('hex');
+  // ── Logout ────────────────────────────────────────────────────────────────
 
-    const result = await this.refreshTokenRepo.update(
-      { tokenHash, isRevoked: false },
-      { isRevoked: true },
-    );
-    if (result.affected === 0) {
+  async logout(refreshToken: string): Promise<void> {
+    const revoked = await this.tokenService.revokeByHash(refreshToken);
+    if (!revoked) {
       throw new UnauthorizedException('Token not found or already revoked');
     }
   }
 
-  // private generateRandomToken(): string {
-  //   return crypto.randomBytes(32).toString('hex');
-  // }
+  async logoutAll(userId: string): Promise<void> {
+    await this.tokenService.revokeAllSessions(userId);
+  }
+
+  // ── Sessions ──────────────────────────────────────────────────────────────
+
+  async getSessions(userId: string): Promise<SessionInfo[]> {
+    return this.tokenService.getActiveSessions(userId);
+  }
+
+  async revokeSession(
+    tokenId: string,
+    userId: string,
+  ): Promise<{ message: string }> {
+    const revoked = await this.tokenService.revokeSession(tokenId, userId);
+    if (!revoked) {
+      throw new UnauthorizedException('Session not found');
+    }
+    return { message: 'Session revoked successfully' };
+  }
+
+  // ── Private Helpers ───────────────────────────────────────────────────────
+
+  private hashToken(raw: string): string {
+    return crypto.createHash('sha256').update(raw).digest('hex');
+  }
+
+  private assertAccountActive(status: AccountStatus): void {
+    switch (status) {
+      case AccountStatus.ACTIVE:
+        return;
+      case AccountStatus.PENDING_VERIFICATION:
+        throw new ForbiddenException(
+          'Please verify your email to activate your account',
+        );
+      case AccountStatus.SUSPENDED:
+        throw new ForbiddenException(
+          'Your account has been suspended. Please contact support.',
+        );
+      case AccountStatus.BANNED:
+        throw new ForbiddenException(
+          'Your account has been permanently banned.',
+        );
+      case AccountStatus.DEACTIVATED:
+        throw new ForbiddenException(
+          'Your account is deactivated. Please reactivate it.',
+        );
+    }
+  }
 }
