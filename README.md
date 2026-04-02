@@ -1,98 +1,330 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Ticket Booking System
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A RESTful API backend for an event ticket booking platform. Built with **NestJS**, **TypeORM**, and **MySQL**, supporting the full booking lifecycle from event creation to QR-coded ticket generation.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Table of Contents
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [Overview](#overview)
+- [Tech Stack](#tech-stack)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [API Modules](#api-modules)
+- [Database](#database)
+- [Authentication Flow](#authentication-flow)
+- [Booking Flow](#booking-flow)
 
-## Project setup
+---
 
-```bash
-$ pnpm install
+## Overview
+
+This system provides the backend infrastructure for a multi-role event ticketing platform. It supports three user roles: **User** (attendee), **Organizer** (event creator), and **Admin** (platform manager).
+
+Key design decisions:
+- **Pessimistic locking** on ticket inventory to prevent overselling under concurrent requests
+- **Two-phase booking** (reservation → order) with time-limited holds and automatic expiration via cron
+- **Refresh token rotation** with reuse detection and per-session revocation
+- **Soft delete** for events to preserve historical order and ticket records
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | NestJS 11 (TypeScript) |
+| Database | MySQL 8 via TypeORM 0.3 |
+| Auth | JWT (access + refresh tokens), Passport |
+| Queue | BullMQ + Redis |
+| Email | Nodemailer + @nestjs-modules/mailer (Handlebars templates) |
+| Image Upload | Cloudinary |
+| QR Codes | `qrcode` package |
+| Real-time | Socket.IO (WebSocket gateway) |
+| Scheduling | @nestjs/schedule (Cron jobs) |
+| Rate Limiting | @nestjs/throttler |
+| Package Manager | pnpm |
+
+---
+
+## Features
+
+### Authentication
+- Register with email verification
+- Login with access token + refresh token pair
+- Refresh token rotation with reuse detection (all sessions revoked on replay)
+- Forgot / reset password via email
+- Multiple active sessions with per-session revocation
+- Cron-based cleanup of expired tokens
+
+### Users
+- View and update profile
+- Change password
+- Self-deactivation
+
+### Events (Organizer)
+- Create events with optional image upload (Cloudinary)
+- Full lifecycle management: `DRAFT` → `PUBLISHED` → `CANCELLED` / `FINISHED`
+- Slug auto-generation with uniqueness guarantee
+- Soft delete for draft events
+
+### Ticket Types (Organizer)
+- Create multiple ticket types per event with configurable sale windows
+- Inventory tracking: `quantity`, `soldQuantity`, `reservedQuantity`
+- Business rule enforcement (cannot modify after sales begin, etc.)
+- Public listing filters active sale window and available stock
+
+### Reservations
+- Pessimistic write lock on ticket inventory during reservation
+- Configurable expiration window (default: 10 minutes)
+- Cron job runs every minute to expire stale reservations and release held stock
+
+### Orders
+- Convert active reservation into a pending order
+- Order has its own TTL (default: 15 minutes)
+- Snapshot unit prices at order creation time
+
+### Payments
+- Payment intent creation (mock provider included, pluggable via interface)
+- Payment confirmation with idempotency checks inside a transaction
+- Automatic ticket generation on successful payment
+
+### Tickets
+- Unique QR code per ticket (UUID-based code, uploaded to Cloudinary)
+- Idempotency guard: re-triggering ticket generation returns existing tickets
+- Paginated "my tickets" endpoint with event and ticket type details
+
+### Analytics
+- Per-event stats: total sold, checked in, pending check-in, check-in rate
+- Real-time updates via Socket.IO gateway (`/analytics` namespace)
+- JWT-authenticated WebSocket connections
+
+### Admin Panel
+- User management: list, view, update role/status, suspend, activate
+- Event management: list, view, force-cancel with reason
+- Order management: list and view
+- Ticket management: list and view
+- System-wide statistics and revenue breakdown by period (day/week/month)
+- Audit log for all admin actions
+- CSV export for users and orders
+- Rate-limited write operations
+
+---
+
+## Project Structure
+
+```
+src/
+├── common/
+│   ├── decorators/         # @CurrentUser, @Roles
+│   ├── entities/           # BaseEntity (id, createdAt, updatedAt)
+│   ├── enums/              # UserRole
+│   ├── filters/            # TransformInterceptor (unified response shape)
+│   ├── guards/             # JwtAuthGuard, RolesGuard, AccountStatusGuard
+│   └── interceptors/       # GlobalExceptionFilter
+│
+├── database/
+│   ├── data-source.ts      # TypeORM DataSource (used by migrations)
+│   └── migrations/
+│
+└── modules/
+    ├── auth/               # JWT auth, token management, verification
+    ├── users/              # Profile, password, account status
+    ├── events/             # Event CRUD, publish/cancel lifecycle
+    ├── ticket-types/       # Inventory management per event
+    ├── reservations/       # Holds with expiration
+    ├── orders/             # Order creation from reservation
+    ├── payments/           # Payment intent + confirmation
+    ├── tickets/            # QR ticket generation and retrieval
+    ├── notifications/      # Email service (Handlebars templates)
+    ├── analytics/          # Event stats + WebSocket gateway
+    ├── media/              # Cloudinary upload/delete
+    └── admin/              # Admin controllers and facade service
 ```
 
-## Compile and run the project
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 20
+- pnpm
+- MySQL 8
+- Redis 7
+
+### 1. Start infrastructure with Docker
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+docker compose up -d
 ```
 
-## Run tests
+This starts MySQL on port `3306` and Redis on port `6379`.
+
+### 2. Install dependencies
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 3. Configure environment
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+cp .env.example .env
+# Edit .env with your values
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 4. Run database migrations
 
-## Resources
+```bash
+pnpm run migration:run
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### 5. Start the development server
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+pnpm run start:dev
+```
 
-## Support
+The API will be available at `http://localhost:5000`.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+---
 
-## Stay in touch
+## Environment Variables
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+| Variable | Description | Example |
+|---|---|---|
+| `PORT` | Server port | `5000` |
+| `DB_HOST` | MySQL host | `localhost` |
+| `DB_PORT` | MySQL port | `3306` |
+| `DB_USERNAME` | MySQL user | `root` |
+| `DB_PASSWORD` | MySQL password | — |
+| `DB_NAME` | Database name | `ticket_booking` |
+| `REDIS_HOST` | Redis host | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `JWT_SECRET` | Access token secret | — |
+| `JWT_REFRESH_SECRET` | Refresh token secret | — |
+| `TICKET_QR_SECRET` | QR code signing secret | — |
+| `EMAIL_HOST` | SMTP host | `smtp.gmail.com` |
+| `EMAIL_PORT` | SMTP port | `587` |
+| `EMAIL_USER` | SMTP user | — |
+| `EMAIL_PASS` | SMTP password / app token | — |
+| `MAIL_FROM` | Sender display name + address | `"App <no-reply@app.com>"` |
+| `EMAIL_VERIFICATION_URL` | Base URL for email verify link | `http://localhost:5000/auth/verify-email` |
+| `PASSWORD_RESET_URL` | Base URL for password reset link | `http://localhost:5000/auth/reset-password` |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | — |
+| `CLOUDINARY_API_KEY` | Cloudinary API key | — |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret | — |
+| `RESERVATION_EXPIRY_MINUTES` | Reservation hold duration | `10` |
+| `ORDER_TTL_MINUTES` | Order payment window | `15` |
+| `CORS_ORIGIN` | Allowed frontend origin(s) | `http://localhost:5173` |
+
+---
+
+## API Modules
+
+| Prefix | Description | Auth Required |
+|---|---|---|
+| `POST /auth/register` | Register a new account | No |
+| `GET /auth/verify-email` | Verify email via token | No |
+| `POST /auth/login` | Login and receive tokens | No |
+| `POST /auth/refresh` | Rotate refresh token | No |
+| `POST /auth/forgot-password` | Request password reset email | No |
+| `POST /auth/reset-password` | Reset password via token | No |
+| `POST /auth/logout` | Revoke current session | Yes |
+| `GET /auth/sessions` | List active sessions | Yes |
+| `GET /users/me` | Get own profile | Yes |
+| `PATCH /users/me` | Update own profile | Yes |
+| `GET /events/public` | List published events | No |
+| `POST /events` | Create event | Organizer |
+| `PATCH /events/:id/publish` | Publish a draft event | Organizer |
+| `PATCH /events/:id/cancel` | Cancel a published event | Organizer |
+| `GET /events/:eventId/ticket-types` | List available ticket types | No |
+| `POST /reservations` | Reserve tickets | User |
+| `POST /orders` | Convert reservation to order | User |
+| `POST /payments/:orderId/intent` | Create payment intent | User |
+| `POST /payments/:paymentId/confirm` | Confirm payment | User |
+| `GET /tickets/my` | Get own tickets | User |
+| `GET /admin/users` | List all users | Admin |
+| `GET /admin/stats` | System statistics | Admin |
+| `GET /admin/stats/revenue` | Revenue by period | Admin |
+| `GET /admin/audit-logs` | Admin action audit log | Admin |
+
+---
+
+## Database
+
+TypeORM migrations are used exclusively (`synchronize: false` in production).
+
+**Migration commands:**
+
+```bash
+# Generate a migration from entity changes
+pnpm run migration:generate src/database/migrations/MigrationName
+
+# Apply pending migrations
+pnpm run migration:run
+
+# Revert the last migration
+pnpm run migration:revert
+```
+
+**Core entities:** `User`, `Event`, `TicketType`, `Reservation`, `ReservationItem`, `Order`, `OrderItem`, `Payment`, `Ticket`, `RefreshToken`, `UserVerificationToken`, `AdminAuditLog`
+
+---
+
+## Authentication Flow
+
+```
+Register → [Email Verification] → Login
+              ↓
+         Access Token (short-lived) + Refresh Token (long-lived)
+              ↓
+         Access Token expires → POST /auth/refresh → New token pair
+              ↓
+         Old refresh token is immediately revoked (rotation)
+         Reuse of revoked token → All sessions revoked
+```
+
+---
+
+## Booking Flow
+
+```
+1. Browse published events          GET /events/public
+2. View available ticket types      GET /events/:id/ticket-types
+3. Create reservation               POST /reservations
+   └─ Inventory held with pessimistic lock
+   └─ Expires in RESERVATION_EXPIRY_MINUTES if not completed
+4. Convert to order                 POST /orders
+   └─ Prices snapshotted
+   └─ Expires in ORDER_TTL_MINUTES if not paid
+5. Create payment intent            POST /payments/:orderId/intent
+6. Confirm payment                  POST /payments/:paymentId/confirm
+   └─ Order marked PAID
+   └─ QR-coded tickets generated
+7. View tickets                     GET /tickets/my
+```
+
+---
+
+## Scripts
+
+```bash
+pnpm run start:dev       # Development server with watch mode
+pnpm run start:prod      # Production server (requires build)
+pnpm run build           # Compile TypeScript
+pnpm run lint            # Lint and auto-fix
+pnpm run format          # Format with Prettier
+pnpm run test            # Unit tests
+pnpm run test:e2e        # End-to-end tests
+pnpm run test:cov        # Test coverage report
+```
+
+---
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED — private project.
