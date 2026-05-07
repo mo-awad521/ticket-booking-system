@@ -15,6 +15,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { UserRole } from 'src/common/enums/user-role.enum';
 import { AssignStaffDto } from '../dtos/assign-staff.dto';
 import { EventStaffAssignmentsService } from '../services/event-staff-assignments.service';
+import { ResponseMessage } from 'src/common/filters/transform.interceptor';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ORGANIZER)
@@ -26,6 +27,7 @@ export class EventStaffAssignmentsController {
 
   // POST /events/:eventId/staff
   @Post()
+  @ResponseMessage('Staff added successfully')
   assignStaff(
     @Param('eventId', ParseUUIDPipe) eventId: string,
     @Body() dto: AssignStaffDto,
@@ -40,6 +42,7 @@ export class EventStaffAssignmentsController {
 
   // DELETE /events/:eventId/staff/:staffId
   @Delete(':staffId')
+  @ResponseMessage('Staff removed from event')
   removeStaff(
     @Param('eventId', ParseUUIDPipe) eventId: string,
     @Param('staffId', ParseUUIDPipe) staffId: string,
@@ -50,6 +53,7 @@ export class EventStaffAssignmentsController {
 
   // GET /events/:eventId/staff
   @Get()
+  @ResponseMessage('Staff fitched successfully')
   listStaff(
     @Param('eventId', ParseUUIDPipe) eventId: string,
     @CurrentUser('id') organizerId: string,

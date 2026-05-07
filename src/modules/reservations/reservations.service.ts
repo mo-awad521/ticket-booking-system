@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Event, EventStatus } from '../events/entities/event.entity';
 import { TicketType } from '../ticket-types/entities/ticket-type.entity';
 import { CreateReservationDto } from './dtos/create-reservation.dto';
@@ -12,12 +12,15 @@ import { ReservationResponseDto } from './dtos/reservation-response.dto';
 import { ReservationItem } from './entities/reservation-item.entity';
 import { Reservation } from './entities/reservation.entity';
 import { ReservationStatus } from './enums/reservation-status.enum';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class ReservationsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
+    @InjectRepository(Reservation)
+    private readonly reservationRepo: Repository<Reservation>,
   ) {}
 
   /* -------------------------------------------------------------------------- */
@@ -117,6 +120,13 @@ export class ReservationsService {
 
       return new ReservationResponseDto(savedReservation);
     });
+  }
+
+  async getReservations(userId: string): Promise<Reservation[] | null> {
+    const reservations = this.reservationRepo.find({
+      where: { userId: userId },
+    });
+    return reservations;
   }
 
   /* -------------------------------------------------------------------------- */

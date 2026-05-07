@@ -20,6 +20,7 @@ import { TicketTypesService } from './ticket-types.service';
 import { CreateTicketTypeDto } from './dtos/create-ticket-type.dto';
 import { UpdateTicketTypeDto } from './dtos/update-ticket-type.dto';
 import { OrganizerTicketQueryDto } from './dtos/organizer-ticket-query.dto';
+import { ResponseMessage } from 'src/common/filters/transform.interceptor';
 
 @Controller('events/:eventId/ticket-types')
 export class TicketTypesController {
@@ -32,6 +33,7 @@ export class TicketTypesController {
   @Get('manage')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
+  @ResponseMessage('Ticket types fetched successfully')
   getOwnerTickets(
     @Param('eventId') eventId: string,
     @CurrentUser('id') userId: string,
@@ -52,6 +54,7 @@ export class TicketTypesController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
+  @ResponseMessage('Ticket type created successfully')
   create(
     @Param('eventId') eventId: string,
     @CurrentUser('id') userId: string,
@@ -63,6 +66,7 @@ export class TicketTypesController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
+  @ResponseMessage('Ticket type updated successfully')
   update(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
@@ -75,6 +79,7 @@ export class TicketTypesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
   @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Ticket type deleted successfully')
   delete(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.ticketTypesService.deleteTicketType(id, userId);
   }

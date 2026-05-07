@@ -62,7 +62,7 @@ export class AuthService {
   }
 
   // ── Register ──────────────────────────────────────────────────────────────
-  async register(dto: RegisterDto): Promise<{ message: string }> {
+  async register(dto: RegisterDto) {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
     const hashedPassword = await bcrypt.hash(dto.password, 12);
@@ -116,14 +116,14 @@ export class AuthService {
       );
     }
 
-    return {
-      message:
-        'Registration successful. Please check your email to verify your account.',
-    };
+    // return {
+    //   message:
+    //     'Registration successful. Please check your email to verify your account.',
+    // };
   }
   // ── Verify Email ──────────────────────────────────────────────────────────
 
-  async verifyEmail(rawToken: string): Promise<{ message: string }> {
+  async verifyEmail(rawToken: string) {
     if (!rawToken?.trim()) {
       throw new BadRequestException('Verification token is required');
     }
@@ -153,15 +153,11 @@ export class AuthService {
       await manager.save(token.user);
       await manager.save(token);
     });
-
-    return { message: 'Email verified successfully. You can now log in.' };
   }
 
   // ── Resend Verification ───────────────────────────────────────────────────
 
-  async resendVerification(
-    dto: ResendVerificationDto,
-  ): Promise<{ message: string }> {
+  async resendVerification(dto: ResendVerificationDto) {
     const GENERIC =
       'If the account exists and is not verified, a verification email has been sent.';
 
@@ -170,7 +166,6 @@ export class AuthService {
       return { message: GENERIC };
     }
 
-    // إلغاء الـ tokens القديمة
     await this.verificationRepo.update(
       {
         user: { id: user.id },
@@ -197,7 +192,6 @@ export class AuthService {
       user.name,
       rawToken,
     );
-    return { message: GENERIC };
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -322,7 +316,7 @@ export class AuthService {
 
   // ── Reset Password ────────────────────────────────────────────────────────
 
-  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+  async resetPassword(dto: ResetPasswordDto) {
     const tokenHash = this.hashToken(dto.token);
     const token = await this.verificationRepo.findOne({
       where: {
@@ -345,8 +339,6 @@ export class AuthService {
     });
 
     await this.tokenService.revokeAllSessions(token.user.id);
-
-    return { message: 'Password reset successful. Please log in again.' };
   }
 
   // ── Logout ────────────────────────────────────────────────────────────────

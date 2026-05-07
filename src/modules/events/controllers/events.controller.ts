@@ -24,6 +24,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from 'src/common/enums/user-role.enum';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { multerOptions } from '../../media/cloudinary.multer';
+import { ResponseMessage } from 'src/common/filters/transform.interceptor';
 
 @Controller('events')
 export class EventsController {
@@ -34,12 +35,14 @@ export class EventsController {
   /* -------------------------------------------------------------------------- */
 
   @Get('public')
+  @ResponseMessage('Events fetched successfully')
   getPublicEvents(@Query() query: QueryEventsDto) {
     return this.eventsService.getPublicEvents(query);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('organizer/my-events')
+  @Get('my')
+  @ResponseMessage('Events fetched successfully')
   async getMyEvents(
     @CurrentUser('id') userId: string,
     @Query() query: OrganizerEventsQueryDto,
@@ -59,6 +62,7 @@ export class EventsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
   @Post()
+  @ResponseMessage('Event created successfully')
   @UseInterceptors(FileInterceptor('image', multerOptions))
   async create(
     @CurrentUser('id') userId: string,
@@ -71,6 +75,7 @@ export class EventsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
   @Patch(':id')
+  @ResponseMessage('Event updated successfully')
   @UseInterceptors(FileInterceptor('image', multerOptions))
   update(
     @Param('id') id: string,
@@ -84,6 +89,7 @@ export class EventsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
   @Patch(':id/publish')
+  @ResponseMessage('Event published successfully')
   publish(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.eventsService.publishEvent(id, userId);
   }
@@ -91,6 +97,7 @@ export class EventsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
   @Patch(':id/cancel')
+  @ResponseMessage('Event cancelled successfully')
   cancel(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.eventsService.cancelEvent(id, userId);
   }
@@ -98,6 +105,7 @@ export class EventsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ORGANIZER)
   @Delete(':id')
+  @ResponseMessage('Event deleted successfully')
   remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.eventsService.deleteEvent(id, userId);
   }

@@ -61,8 +61,6 @@ export class EventStaffAssignmentsService {
     assignment.isActive = false;
     assignment.deactivatedAt = new Date();
     await this.assignmentRepo.save(assignment);
-
-    return { message: 'Staff removed from event' };
   }
 
   async listStaff(eventId: string, requesterId: string) {

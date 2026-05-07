@@ -22,9 +22,9 @@ export const enum TicketCategory {
 @Index(['eventId', 'saleStart'])
 @Index(['eventId', 'saleEnd'])
 @Check(`quantity > 0`)
-@Check(`soldQuantity >= 0`)
-@Check(`reservedQuantity >= 0`)
-@Check(`soldQuantity + reservedQuantity <= quantity`)
+@Check(`sold_quantity >= 0`)
+@Check(`reserved_quantity >= 0`)
+@Check(`sold_quantity + reserved_quantity <= quantity`)
 export class TicketType extends BaseEntity {
   /* -------------------------------------------------------------------------- */
   /*                                BASIC INFO                                  */
@@ -44,13 +44,13 @@ export class TicketType extends BaseEntity {
   /*                                INVENTORY                                   */
   /* -------------------------------------------------------------------------- */
 
-  @Column({ type: 'int', unsigned: true })
+  @Column({ type: 'int' })
   quantity: number;
 
-  @Column({ type: 'int', unsigned: true, default: 0 })
+  @Column({ type: 'int', default: 0 })
   soldQuantity: number;
 
-  @Column({ type: 'int', unsigned: true, default: 0 })
+  @Column({ type: 'int', default: 0 })
   reservedQuantity: number;
 
   /* -------------------------------------------------------------------------- */

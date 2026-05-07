@@ -23,6 +23,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ResponseMessage } from 'src/common/filters/transform.interceptor';
 
 @Controller('auth')
 export class AuthController {
@@ -30,12 +31,16 @@ export class AuthController {
 
   // POST /auth/register
   @Post('register')
+  @ResponseMessage(
+    'Registration successful. Please check your email to verify your account.',
+  )
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
   // GET /auth/verify-email?token=...
   @Get('verify-email')
+  @ResponseMessage('Email verified successfully. You can now log in.')
   verifyEmail(@Query('token') token: string) {
     return this.authService.verifyEmail(token);
   }
@@ -45,6 +50,9 @@ export class AuthController {
   @Throttle({ strict: { limit: 3, ttl: 3_600_000 } })
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
+  @ResponseMessage(
+    'If the account exists and is not verified, a verification email has been sent.',
+  )
   resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerification(dto);
   }
@@ -53,12 +61,16 @@ export class AuthController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ auth: { limit: 5, ttl: 60_000 } })
   @Post('login')
+  @ResponseMessage('Login successfully')
+  @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto, req);
   }
 
   // POST /auth/refresh
   @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Refresh created successfully')
   refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
     return this.authService.refresh(dto, req);
   }
@@ -68,6 +80,7 @@ export class AuthController {
   @Throttle({ strict: { limit: 3, ttl: 3_600_000 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
+  //@ResponseMessage('If the email exists, a reset link has been sent.')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
@@ -75,6 +88,7 @@ export class AuthController {
   // POST /auth/reset-password
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Password reset successful. Please log in again.')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
@@ -92,14 +106,15 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout-all')
   @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Logged out from all devices successfully')
   async logoutAll(@CurrentUser('id') userId: string) {
     await this.authService.logoutAll(userId);
-    return { message: 'Logged out from all devices successfully' };
   }
 
-  // GET /auth/sessions 
+  // GET /auth/sessions
   @UseGuards(JwtAuthGuard)
   @Get('sessions')
+  @ResponseMessage('Get all sessions successfully')
   getSessions(@CurrentUser('id') userId: string) {
     return this.authService.getSessions(userId);
   }

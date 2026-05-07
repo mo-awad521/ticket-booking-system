@@ -17,6 +17,8 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { AdminModule } from './modules/admin/admin.module';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -26,6 +28,11 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     TypeOrmModule.forRoot(dataSourceOptions),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
+    ThrottlerModule.forRoot([
+      { name: 'auth', ttl: 60_000, limit: 5 },
+      { name: 'strict', ttl: 3_600_000, limit: 3 },
+      { name: 'default', ttl: 60_000, limit: 100 },
+    ]),
     UsersModule,
     AuthModule,
     NotificationsModule,
@@ -37,6 +44,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     PaymentsModule,
     TicketsModule,
     AnalyticsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
