@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { DataSource, LessThan } from 'typeorm';
+import { DataSource, In, LessThan } from 'typeorm';
 import { Reservation } from '../entities/reservation.entity';
 import { ReservationStatus } from '../enums/reservation-status.enum';
 import { TicketType } from '../../ticket-types/entities/ticket-type.entity';
@@ -19,8 +19,14 @@ export class ReservationExpirationService {
           status: ReservationStatus.ACTIVE,
           expiresAt: LessThan(new Date()),
         },
-        relations: ['items'],
         lock: { mode: 'pessimistic_write' },
+      });
+
+      const reservationsWithItems = await trx.find(Reservation, {
+        where: {
+          id: In(expiredReservations.map((r) => r.id)),
+        },
+        relations: ['items'],
       });
 
       if (!expiredReservations.length) return;
@@ -31,7 +37,7 @@ export class ReservationExpirationService {
 
       const quantityMap = new Map<string, number>();
 
-      for (const reservation of expiredReservations) {
+      for (const reservation of reservationsWithItems) {
         for (const item of reservation.items) {
           const prev = quantityMap.get(item.ticketTypeId) ?? 0;
           quantityMap.set(item.ticketTypeId, prev + item.quantity);
