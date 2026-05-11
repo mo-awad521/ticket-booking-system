@@ -292,6 +292,7 @@ export class EventsService {
         'event.startDate',
         'event.endDate',
         'event.status',
+        'event.publishedAt',
       ])
       .where('event.status = :status', { status: EventStatus.PUBLISHED })
       .andWhere('event.startDate > :now', { now: new Date() });
