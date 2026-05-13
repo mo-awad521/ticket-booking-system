@@ -22,30 +22,59 @@ import path from 'path';
     // BullModule.registerQueue({
     //   name: 'mail_queue',
     // }),
+    // MailerModule.forRootAsync({
+    //   useFactory: (config: ConfigService) => ({
+    //     transport: {
+    //       host: config.get('EMAIL_HOST'),
+    //       secure: true,
+    //       auth: {
+    //         user: config.get('EMAIL_USER'),
+    //         pass: config.get('EMAIL_PASS'),
+    //       },
+    //     },
+    //     defaults: {
+    //       from: `"Booking System" <${config.get('EMAIL_USER')}>`,
+    //     },
+    //     template: {
+    //       // بما أن ملف email.module.ts موجود في مجلد email
+    //       // فإن __dirname ستشير إلى dist/email، ونحن نريد مجلد templates الذي بداخله
+    //       dir: path.join(__dirname, 'templates'),
+
+    //       adapter: new HandlebarsAdapter(),
+    //       options: {
+    //         strict: true,
+    //       },
+    //     },
+    //   }),
+    //   inject: [ConfigService],
+    // }),
     MailerModule.forRootAsync({
       useFactory: (config: ConfigService) => ({
         transport: {
           host: config.get('EMAIL_HOST'),
+          port: 465,
           secure: true,
           auth: {
             user: config.get('EMAIL_USER'),
             pass: config.get('EMAIL_PASS'),
           },
         },
+
         defaults: {
-          from: `"Booking System" <${config.get('EMAIL_USER')}>`,
+          from: `"Booking System" <${config.get('EMAIL_FROM')}>`,
         },
+
         template: {
-          // بما أن ملف email.module.ts موجود في مجلد email
-          // فإن __dirname ستشير إلى dist/email، ونحن نريد مجلد templates الذي بداخله
           dir: path.join(__dirname, 'templates'),
 
           adapter: new HandlebarsAdapter(),
+
           options: {
             strict: true,
           },
         },
       }),
+
       inject: [ConfigService],
     }),
   ],
