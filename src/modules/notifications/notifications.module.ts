@@ -1,84 +1,20 @@
 import { Module } from '@nestjs/common';
-import { MailerModule } from '@nestjs-modules/mailer';
-//import { BullModule } from '@nestjs/bullmq';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
-import { NotificationsService } from './notifications.service';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { EmailService } from './email.service';
-//import { MailProcessor } from './mail.processor';
-import path from 'path';
+import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
+import { EMAIL_QUEUE } from './constants/email-jobs.constants';
+import { EmailService } from './services/email.service';
+import { EmailTemplateService } from './services/email-template.service';
+import { NotificationQueueService } from './services/notification-queue.service';
+import { EmailProcessor } from './processors/email.processor';
 
 @Module({
-  imports: [
-    ConfigModule,
-    // 1. إعداد الاتصال بـ Redis
-    // BullModule.forRoot({
-    //   connection: {
-    //     host: 'localhost',
-    //     port: 6379,
-    //   },
-    // }),
-    // 2. تعريف الـ Queue الخاص بالإيميلات
-    // BullModule.registerQueue({
-    //   name: 'mail_queue',
-    // }),
-    // MailerModule.forRootAsync({
-    //   useFactory: (config: ConfigService) => ({
-    //     transport: {
-    //       host: config.get('EMAIL_HOST'),
-    //       secure: true,
-    //       auth: {
-    //         user: config.get('EMAIL_USER'),
-    //         pass: config.get('EMAIL_PASS'),
-    //       },
-    //     },
-    //     defaults: {
-    //       from: `"Booking System" <${config.get('EMAIL_USER')}>`,
-    //     },
-    //     template: {
-    //       // بما أن ملف email.module.ts موجود في مجلد email
-    //       // فإن __dirname ستشير إلى dist/email، ونحن نريد مجلد templates الذي بداخله
-    //       dir: path.join(__dirname, 'templates'),
-
-    //       adapter: new HandlebarsAdapter(),
-    //       options: {
-    //         strict: true,
-    //       },
-    //     },
-    //   }),
-    //   inject: [ConfigService],
-    // }),
-    MailerModule.forRootAsync({
-      useFactory: (config: ConfigService) => ({
-        transport: {
-          host: config.get('EMAIL_HOST'),
-          port: 465,
-          secure: true,
-          auth: {
-            user: config.get('EMAIL_USER'),
-            pass: config.get('EMAIL_PASS'),
-          },
-        },
-
-        defaults: {
-          from: `"Booking System" <${config.get('EMAIL_FROM')}>`,
-        },
-
-        template: {
-          dir: path.join(__dirname, 'templates'),
-
-          adapter: new HandlebarsAdapter(),
-
-          options: {
-            strict: true,
-          },
-        },
-      }),
-
-      inject: [ConfigService],
-    }),
+  imports: [ConfigModule, BullModule.registerQueue({ name: EMAIL_QUEUE })],
+  providers: [
+    EmailService,
+    EmailTemplateService,
+    NotificationQueueService,
+    EmailProcessor,
   ],
-  providers: [NotificationsService, EmailService],
-  exports: [NotificationsService, EmailService],
+  exports: [NotificationQueueService],
 })
 export class NotificationsModule {}

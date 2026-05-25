@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -19,6 +19,10 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AdminModule } from './modules/admin/admin.module';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
+import { BullBoardModule } from '@bull-board/nestjs';
+import { ExpressAdapter } from '@bull-board/express';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 
 @Module({
   imports: [
@@ -26,6 +30,39 @@ import { ThrottlerModule } from '@nestjs/throttler';
       isGlobal: true,
     }),
     TypeOrmModule.forRoot(dataSourceOptions),
+
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const redisUrl = config.get<string>('REDIS_URL');
+
+        return {
+          connection: redisUrl
+            ? { url: redisUrl }
+            : {
+                host: config.get<string>('REDIS_HOST', 'localhost'),
+                port: config.get<number>('REDIS_PORT', 6379),
+                password: config.get<string>('REDIS_PASSWORD'),
+                tls:
+                  config.get<string>('REDIS_TLS') === 'true' ? {} : undefined,
+              },
+          defaultJobOptions: {
+            removeOnComplete: { count: 100 },
+            removeOnFail: { count: 200 },
+          },
+        };
+      },
+    }),
+
+    BullBoardModule.forRoot({
+      route: '/admin/queues',
+      adapter: ExpressAdapter,
+    }),
+    BullBoardModule.forFeature({
+      name: 'email_queue',
+      adapter: BullMQAdapter,
+    }),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot([

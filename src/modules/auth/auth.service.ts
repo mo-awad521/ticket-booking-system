@@ -19,7 +19,7 @@ import { UserVerificationToken } from './entities/user-verification-token.entity
 
 // services
 import { UsersService } from '../users/users.service';
-import { EmailService } from '../notifications/email.service';
+import { NotificationQueueService } from '../notifications/services/notification-queue.service';
 import { TokenService, SessionInfo } from './services/token.service';
 
 // dtos
@@ -45,7 +45,7 @@ export class AuthService {
     private readonly verificationRepo: Repository<UserVerificationToken>,
 
     private readonly usersService: UsersService,
-    private readonly emailService: EmailService,
+    private readonly queueService: NotificationQueueService, // ← replaces EmailService
     private readonly tokenService: TokenService,
     private readonly dataSource: DataSource,
   ) {}
@@ -55,13 +55,12 @@ export class AuthService {
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async cleanupExpiredTokens(): Promise<void> {
     await this.tokenService.deleteExpiredTokens();
-    await this.verificationRepo.delete({
-      expiresAt: LessThan(new Date()),
-    });
+    await this.verificationRepo.delete({ expiresAt: LessThan(new Date()) });
     this.logger.log('Expired tokens cleaned up');
   }
 
   // ── Register ──────────────────────────────────────────────────────────────
+
   async register(dto: RegisterDto) {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
@@ -78,7 +77,6 @@ export class AuthService {
           role: UserRole.USER,
           accountStatus: AccountStatus.PENDING_VERIFICATION,
         });
-
         const savedUser = await manager.save(userEntity);
 
         await manager.save(
@@ -103,24 +101,22 @@ export class AuthService {
       throw error;
     }
 
+    // ── Enqueue verification email (non-blocking) ─────────────────────────
     try {
-      await this.emailService.sendVerificationEmail(
-        createdUser.email,
-        createdUser.name,
-        rawToken,
-      );
+      await this.queueService.sendVerificationEmail({
+        to: createdUser.email,
+        name: createdUser.name,
+        token: rawToken,
+      });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to send verification email to ${createdUser.email}: ${msg}`,
+        `Failed to enqueue verification email to ${createdUser.email}: ${msg}`,
       );
+      // don't rethrow — registration succeeded even if email fails
     }
-
-    // return {
-    //   message:
-    //     'Registration successful. Please check your email to verify your account.',
-    // };
   }
+
   // ── Verify Email ──────────────────────────────────────────────────────────
 
   async verifyEmail(rawToken: string) {
@@ -187,11 +183,11 @@ export class AuthService {
       }),
     );
 
-    await this.emailService.sendVerificationEmail(
-      user.email,
-      user.name,
-      rawToken,
-    );
+    await this.queueService.sendVerificationEmail({
+      to: user.email,
+      name: user.name,
+      token: rawToken,
+    });
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -217,7 +213,6 @@ export class AuthService {
       email: user.email,
       role: user.role,
     };
-
     const { accessToken, refreshToken } =
       await this.tokenService.generateAuthTokens(payload);
 
@@ -306,11 +301,12 @@ export class AuthService {
       }),
     );
 
-    await this.emailService.sendPasswordResetEmail(
-      user.email,
-      user.name,
-      rawToken,
-    );
+    await this.queueService.sendPasswordReset({
+      to: user.email,
+      name: user.name,
+      token: rawToken,
+    });
+
     return { message: GENERIC };
   }
 
@@ -345,9 +341,8 @@ export class AuthService {
 
   async logout(refreshToken: string): Promise<void> {
     const revoked = await this.tokenService.revokeByHash(refreshToken);
-    if (!revoked) {
+    if (!revoked)
       throw new UnauthorizedException('Token not found or already revoked');
-    }
   }
 
   async logoutAll(userId: string): Promise<void> {
@@ -365,9 +360,7 @@ export class AuthService {
     userId: string,
   ): Promise<{ message: string }> {
     const revoked = await this.tokenService.revokeSession(tokenId, userId);
-    if (!revoked) {
-      throw new UnauthorizedException('Session not found');
-    }
+    if (!revoked) throw new UnauthorizedException('Session not found');
     return { message: 'Session revoked successfully' };
   }
 

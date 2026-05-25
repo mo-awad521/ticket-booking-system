@@ -2,7 +2,7 @@
   <head>
     <meta charset='UTF-8' />
     <meta name='viewport' content='width=device-width,initial-scale=1' />
-    <title>Reset your password</title>
+    <title>Your tickets are ready</title>
     <style>
       body {
         margin: 0;
@@ -31,23 +31,14 @@
         font-size: 17px;
         font-weight: 600;
       }
-      .alert-bar {
-        background: #fef3c7;
-        border-left: 4px solid #f59e0b;
-        padding: 12px 16px;
-        margin: 0 32px 24px;
-        border-radius: 4px;
-        font-size: 13px;
-        color: #92400e;
-      }
       .body {
-        padding: 36px 32px 12px;
+        padding: 36px 32px;
       }
       .greeting {
         font-size: 22px;
         font-weight: 600;
         color: #18181b;
-        margin: 0 0 14px;
+        margin: 0 0 12px;
       }
       .text {
         font-size: 15px;
@@ -55,23 +46,48 @@
         line-height: 1.7;
         margin: 0 0 24px;
       }
-      .btn-wrap {
-        margin: 28px 0;
-      }
-      .btn {
-        display: inline-block;
-        padding: 14px 32px;
+      .event-card {
         background: #18181b;
+        border-radius: 10px;
+        padding: 24px;
+        margin-bottom: 24px;
         color: #fff;
-        text-decoration: none;
-        border-radius: 8px;
-        font-size: 15px;
-        font-weight: 500;
       }
-      .divider {
-        border: none;
-        border-top: 1px solid #f0f0f1;
-        margin: 24px 0;
+      .event-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 14px;
+      }
+      .event-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .event-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: #a1a1aa;
+      }
+      .event-row span {
+        color: #ffffff;
+      }
+      .count-pill {
+        display: inline-block;
+        background: #3f3f46;
+        color: #fff;
+        border-radius: 20px;
+        padding: 4px 14px;
+        font-size: 13px;
+        font-weight: 500;
+        margin-top: 14px;
+      }
+      .cta-text {
+        font-size: 15px;
+        color: #52525b;
+        line-height: 1.7;
+        margin: 0 0 16px;
       }
       .note {
         font-size: 13px;
@@ -96,24 +112,30 @@
           <span class='header-logo'>🎟 Ticket Booking</span>
         </div>
         <div class='body'>
-          <p class='greeting'>Reset your password</p>
+          <p class='greeting'>Your tickets are ready! 🎉</p>
           <p class='text'>
             Hi
-            {{name}}, we received a request to reset the password for your
-            account. Click the button below to choose a new password.
+            {{name}}, your QR-coded tickets have been generated. Show them at
+            the entrance to check in.
           </p>
-          <div class='btn-wrap'>
-            <a href='{{url}}' class='btn'>Reset password</a>
+
+          <div class='event-card'>
+            <p class='event-title'>{{eventTitle}}</p>
+            <div class='event-meta'>
+              <div class='event-row'>📅 <span>{{eventDate}}</span></div>
+              <div class='event-row'>📍 <span>{{eventLocation}}</span></div>
+            </div>
+            <div class='count-pill'>{{ticketCount}}
+              ticket{{#if (gt ticketCount 1)}}s{{/if}}</div>
           </div>
-          <hr class='divider' />
-          <p class='note'>
-            ⏱ This link is valid for
-            <strong>1 hour</strong>
-            only.
+
+          <p class='cta-text'>
+            Log in to your account to view and download your QR codes anytime.
           </p>
-          <p class='note' style='margin-top:8px'>
-            If you didn't request a password reset, you can safely ignore this
-            email. Your password will remain unchanged.
+
+          <p class='note'>
+            Each ticket has a unique QR code — please do not share screenshots.
+            Screenshots may not scan correctly at the venue.
           </p>
         </div>
         <div class='footer'><p>© Ticket Booking System</p></div>
