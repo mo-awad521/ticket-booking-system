@@ -94,7 +94,7 @@ export class AuthService {
       if (
         error instanceof Error &&
         'code' in error &&
-        (error as NodeJS.ErrnoException).code === 'ER_DUP_ENTRY'
+        (error as NodeJS.ErrnoException).code === '23505'
       ) {
         throw new ConflictException('Email already in use');
       }
