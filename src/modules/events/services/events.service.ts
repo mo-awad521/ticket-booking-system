@@ -14,6 +14,8 @@ import { QueryEventsDto } from '../dtos/query-event.dto';
 import { OrganizerEventsQueryDto } from '../dtos/organizer-events-query.dto';
 import { CloudinaryService } from '../../media/services/cloudinary.service';
 import { EventResponseDto } from '../dtos/evnet.response.dto';
+import { CacheService } from '../../../common/cache/cache.service';
+import { CacheKey, CacheTTL } from '../../../common/cache/cache.keys';
 
 @Injectable()
 export class EventsService {
@@ -23,7 +25,135 @@ export class EventsService {
 
     private readonly cloudinaryService: CloudinaryService,
     private readonly dataSource: DataSource,
+    private readonly cacheService: CacheService,
   ) {}
+
+  /* -------------------------------------------------------------------------- */
+  /*                           Get Public Events (cached)                       */
+  /* -------------------------------------------------------------------------- */
+
+  async getPublicEvents(query: QueryEventsDto) {
+    const cacheKey = CacheKey.eventsList(
+      query.page,
+      query.limit,
+      query.search,
+      query.location,
+      query.sort,
+    );
+
+    return this.cacheService.wrap(
+      cacheKey,
+      () => this.fetchPublicEvents(query),
+      CacheTTL.PUBLIC_EVENTS,
+    );
+  }
+
+  private async fetchPublicEvents(query: QueryEventsDto) {
+    const { page, limit, search, location, sort } = query;
+
+    const qb = this.eventRepo
+      .createQueryBuilder('event')
+      .select([
+        'event.id',
+        'event.title',
+        'event.slug',
+        'event.description',
+        'event.location',
+        'event.imageUrl',
+        'event.startDate',
+        'event.endDate',
+        'event.status',
+      ])
+      .where('event.status = :status', { status: EventStatus.PUBLISHED })
+      .andWhere('event.startDate > :now', { now: new Date() });
+
+    if (search) {
+      qb.andWhere('event.title ILIKE :search', {
+        search: `%${search.replace(/[%_\\]/g, '\\$&')}%`,
+      });
+    }
+    if (location) {
+      qb.andWhere('event.location ILIKE :location', {
+        location: `%${location.replace(/[%_\\]/g, '\\$&')}%`,
+      });
+    }
+
+    qb.orderBy('event.startDate', sort === 'DESC' ? 'DESC' : 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [events, total] = await qb.getManyAndCount();
+
+    return {
+      data: events.map((e) => new EventResponseDto(e)),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /*                            Find By ID (cached)                             */
+  /* -------------------------------------------------------------------------- */
+
+  async findById(eventId: string) {
+    return this.cacheService.wrap(
+      CacheKey.eventById(eventId),
+      async () => {
+        const event = await this.eventRepo.findOne({ where: { id: eventId } });
+        if (!event) throw new NotFoundException('Event not found');
+        if (event.status !== EventStatus.PUBLISHED)
+          throw new BadRequestException('Event is not published');
+        return new EventResponseDto(event);
+      },
+      CacheTTL.EVENT_DETAIL,
+    );
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /*                       Get Organizer Events (cached)                        */
+  /* -------------------------------------------------------------------------- */
+
+  async getOrganizerEvents(userId: string, query: OrganizerEventsQueryDto) {
+    const cacheKey = CacheKey.organizerEvents(
+      userId,
+      query.page,
+      query.limit,
+      query.status,
+    );
+
+    return this.cacheService.wrap(
+      cacheKey,
+      () => this.fetchOrganizerEvents(userId, query),
+      CacheTTL.ORGANIZER_LIST,
+    );
+  }
+
+  private async fetchOrganizerEvents(
+    userId: string,
+    query: OrganizerEventsQueryDto,
+  ) {
+    const { status, page, limit } = query;
+    const [events, total] = await this.eventRepo.findAndCount({
+      where: { organizerId: userId, ...(status ? { status } : {}) },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+        imageUrl: true,
+        createdAt: true,
+      },
+      relations: ['ticketTypes'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return {
+      data: events.map((e) => new EventResponseDto(e)),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
 
   /* -------------------------------------------------------------------------- */
   /*                              Create Event                                  */
@@ -277,119 +407,119 @@ export class EventsService {
   /*                           Get Public Events                                */
   /* -------------------------------------------------------------------------- */
 
-  async getPublicEvents(query: QueryEventsDto) {
-    const { page, limit, search, location, sort } = query;
+  // async getPublicEvents(query: QueryEventsDto) {
+  //   const { page, limit, search, location, sort } = query;
 
-    const qb = this.eventRepo
-      .createQueryBuilder('event')
-      .select([
-        'event.id',
-        'event.title',
-        'event.slug',
-        'event.description',
-        'event.location',
-        'event.imageUrl',
-        'event.startDate',
-        'event.endDate',
-        'event.status',
-        'event.publishedAt',
-      ])
-      .where('event.status = :status', { status: EventStatus.PUBLISHED })
-      .andWhere('event.startDate > :now', { now: new Date() });
+  //   const qb = this.eventRepo
+  //     .createQueryBuilder('event')
+  //     .select([
+  //       'event.id',
+  //       'event.title',
+  //       'event.slug',
+  //       'event.description',
+  //       'event.location',
+  //       'event.imageUrl',
+  //       'event.startDate',
+  //       'event.endDate',
+  //       'event.status',
+  //       'event.publishedAt',
+  //     ])
+  //     .where('event.status = :status', { status: EventStatus.PUBLISHED })
+  //     .andWhere('event.startDate > :now', { now: new Date() });
 
-    /* ------------------------------ Search ----------------------------- */
-    if (search) {
-      const safeSearch = search.replace(/[%_\\]/g, '\\$&');
-      qb.andWhere('event.title ILIKE :search', {
-        search: `%${safeSearch}%`,
-      });
-    }
+  //   /* ------------------------------ Search ----------------------------- */
+  //   if (search) {
+  //     const safeSearch = search.replace(/[%_\\]/g, '\\$&');
+  //     qb.andWhere('event.title ILIKE :search', {
+  //       search: `%${safeSearch}%`,
+  //     });
+  //   }
 
-    /* ------------------------------ Filter ----------------------------- */
-    if (location) {
-      const safeLocation = location.replace(/[%_\\]/g, '\\$&');
-      qb.andWhere('event.location ILIKE :location', {
-        location: `%${safeLocation}%`,
-      });
-    }
+  //   /* ------------------------------ Filter ----------------------------- */
+  //   if (location) {
+  //     const safeLocation = location.replace(/[%_\\]/g, '\\$&');
+  //     qb.andWhere('event.location ILIKE :location', {
+  //       location: `%${safeLocation}%`,
+  //     });
+  //   }
 
-    /* ------------------------------ Sorting ---------------------------- */
-    const sortOrder = sort === 'DESC' ? 'DESC' : 'ASC';
-    qb.orderBy('event.startDate', sortOrder);
+  //   /* ------------------------------ Sorting ---------------------------- */
+  //   const sortOrder = sort === 'DESC' ? 'DESC' : 'ASC';
+  //   qb.orderBy('event.startDate', sortOrder);
 
-    /* --------------------------- Pagination ---------------------------- */
-    qb.skip((page - 1) * limit).take(limit);
+  //   /* --------------------------- Pagination ---------------------------- */
+  //   qb.skip((page - 1) * limit).take(limit);
 
-    const [events, total] = await qb.getManyAndCount();
+  //   const [events, total] = await qb.getManyAndCount();
 
-    return {
-      data: events.map((event) => new EventResponseDto(event)),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
+  //   return {
+  //     data: events.map((event) => new EventResponseDto(event)),
+  //     meta: {
+  //       total,
+  //       page,
+  //       limit,
+  //       totalPages: Math.ceil(total / limit),
+  //     },
+  //   };
+  // }
 
-  async findById(eventId: string) {
-    const event = await this.eventRepo.findOne({ where: { id: eventId } });
-    if (!event) {
-      throw new NotFoundException('Event not found');
-    }
+  // async findById(eventId: string) {
+  //   const event = await this.eventRepo.findOne({ where: { id: eventId } });
+  //   if (!event) {
+  //     throw new NotFoundException('Event not found');
+  //   }
 
-    if (!(event.status === EventStatus.PUBLISHED)) {
-      return new BadRequestException('You can get only published events');
-    }
+  //   if (!(event.status === EventStatus.PUBLISHED)) {
+  //     return new BadRequestException('You can get only published events');
+  //   }
 
-    return new EventResponseDto(event);
-  }
+  //   return new EventResponseDto(event);
+  // }
 
   /* -------------------------------------------------------------------------- */
   /*                          Get Organizer Events                              */
   /* -------------------------------------------------------------------------- */
 
-  async getOrganizerEvents(userId: string, query: OrganizerEventsQueryDto) {
-    const { status, page, limit } = query;
+  // async getOrganizerEvents(userId: string, query: OrganizerEventsQueryDto) {
+  //   const { status, page, limit } = query;
 
-    const [events, total] = await this.eventRepo.findAndCount({
-      where: {
-        organizerId: userId,
-        ...(status && { status }),
-      },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        status: true,
-        startDate: true,
-        endDate: true,
-        imageUrl: true,
-        createdAt: true,
-        ticketTypes: {
-          id: true,
-          name: true,
-          price: true,
-          //capacity: true,
-        },
-      },
-      relations: ['ticketTypes'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  //   const [events, total] = await this.eventRepo.findAndCount({
+  //     where: {
+  //       organizerId: userId,
+  //       ...(status && { status }),
+  //     },
+  //     select: {
+  //       id: true,
+  //       title: true,
+  //       slug: true,
+  //       status: true,
+  //       startDate: true,
+  //       endDate: true,
+  //       imageUrl: true,
+  //       createdAt: true,
+  //       ticketTypes: {
+  //         id: true,
+  //         name: true,
+  //         price: true,
+  //         //capacity: true,
+  //       },
+  //     },
+  //     relations: ['ticketTypes'],
+  //     order: { createdAt: 'DESC' },
+  //     skip: (page - 1) * limit,
+  //     take: limit,
+  //   });
 
-    return {
-      data: events.map((event) => new EventResponseDto(event)),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
+  //   return {
+  //     data: events.map((event) => new EventResponseDto(event)),
+  //     meta: {
+  //       total,
+  //       page,
+  //       limit,
+  //       totalPages: Math.ceil(total / limit),
+  //     },
+  //   };
+  // }
 
   /* -------------------------------------------------------------------------- */
   /*                              Helper Methods                                */
