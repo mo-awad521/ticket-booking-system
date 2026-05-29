@@ -12,18 +12,22 @@ import { CacheService } from './cache.service';
       inject: [ConfigService],
       isGlobal: true,
       useFactory: (config: ConfigService) => {
-        const host = config.get<string>('REDIS_HOST', '127.0.0.1');
-        const port = config.get<number>('REDIS_PORT', 6379);
-        const password = config.get<string>('REDIS_PASSWORD', '');
-        const useTls = config.get<string>('REDIS_TLS', 'false') === 'true';
+        let url = config.get<string>('REDIS_URL');
 
-        const protocol = useTls ? 'rediss' : 'redis';
-        const auth = password ? `:${password}@` : '';
-        const url = `${protocol}://${auth}${host}:${port}`;
+        if (!url) {
+          const host = config.get<string>('REDIS_HOST', '127.0.0.1');
+          const port = config.get<number>('REDIS_PORT', 6379);
+          const password = config.get<string>('REDIS_PASSWORD', '');
+          const useTls = config.get<string>('REDIS_TLS', 'false') === 'true';
+
+          const protocol = useTls ? 'rediss' : 'redis';
+          const auth = password ? `:${password}@` : '';
+          url = `${protocol}://${auth}${host}:${port}`;
+        }
 
         return {
-          store: createKeyv(url),
-          ttl: 60_000, // default 60s — overridden per call
+          stores: [createKeyv(url)],
+          ttl: 60_000, // 60 seconds default
         };
       },
     }),
