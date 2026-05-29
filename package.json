@@ -11,7 +11,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node --max-old-space-size=450 dist/main",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:generate": "pnpm run typeorm -- migration:generate -d src/database/data-source.ts",
     "migration:run": "pnpm run typeorm -- migration:run -d src/database/data-source.ts",

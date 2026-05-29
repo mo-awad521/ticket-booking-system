@@ -41,7 +41,11 @@ import { AppCacheModule } from './common/cache/cache.module';
 
         return {
           connection: redisUrl
-            ? { url: redisUrl }
+            ? {
+                url: redisUrl,
+                maxRetriesPerRequest: null,
+                enableReadyCheck: false,
+              }
             : {
                 host: config.get<string>('REDIS_HOST', 'localhost'),
                 port: config.get<number>('REDIS_PORT', 6379),

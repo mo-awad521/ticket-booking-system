@@ -9,20 +9,24 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class RedisHealthIndicator extends HealthIndicator {
+  private readonly client: Redis;
+
   constructor(private readonly config: ConfigService) {
     super();
-  }
 
-  async isHealthy(key: string): Promise<HealthIndicatorResult> {
     const redisUrl = this.config.get<string>('REDIS_URL');
-    let client: Redis;
 
     if (redisUrl) {
-      client = new Redis(redisUrl, {
+      this.client = new Redis(redisUrl, {
         connectTimeout: 3_000,
         commandTimeout: 3_000,
-        maxRetriesPerRequest: 0,
+
+        // IMPORTANT FOR BULLMQ + RENDER
+        maxRetriesPerRequest: null,
+
         enableReadyCheck: false,
+
+        // prevents immediate connection spam on bootstrap
         lazyConnect: true,
       });
     } else {
@@ -31,27 +35,37 @@ export class RedisHealthIndicator extends HealthIndicator {
       const password = this.config.get<string>('REDIS_PASSWORD', '');
       const useTls = this.config.get<string>('REDIS_TLS', 'false') === 'true';
 
-      client = new Redis({
+      this.client = new Redis({
         host,
         port,
         ...(password ? { password } : {}),
         ...(useTls ? { tls: { rejectUnauthorized: false } } : {}),
+
         connectTimeout: 3_000,
         commandTimeout: 3_000,
-        maxRetriesPerRequest: 0,
+
+        // IMPORTANT FOR BULLMQ + RENDER
+        maxRetriesPerRequest: null,
+
         enableReadyCheck: false,
         lazyConnect: true,
       });
     }
+  }
 
+  async isHealthy(key: string): Promise<HealthIndicatorResult> {
     try {
-      await client.connect();
-      const pong = await client.ping();
-      await client.quit();
+      // connect only if not connected
+      if (this.client.status === 'wait') {
+        await this.client.connect();
+      }
+
+      const pong = await this.client.ping();
+
       return this.getStatus(key, pong === 'PONG');
     } catch (err) {
-      await client.quit().catch(() => {});
       const message = err instanceof Error ? err.message : 'Redis unreachable';
+
       throw new HealthCheckError(
         message,
         this.getStatus(key, false, { message }),
