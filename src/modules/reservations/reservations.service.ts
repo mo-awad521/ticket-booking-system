@@ -42,7 +42,6 @@ export class ReservationsService {
       for (const item of mergedItems) {
         const ticket = await ticketRepo.findOne({
           where: { id: item.ticketTypeId },
-          relations: ['event'],
           lock: { mode: 'pessimistic_write' },
         });
 
@@ -51,14 +50,21 @@ export class ReservationsService {
             `Ticket type ${item.ticketTypeId} not found`,
           );
         }
+        const event = await manager.getRepository(Event).findOne({
+          where: { id: ticket.eventId },
+        });
 
-        if (ticket.event.status !== EventStatus.PUBLISHED) {
+        if (!event) {
+          throw new NotFoundException('Event not found');
+        }
+
+        if (event.status !== EventStatus.PUBLISHED) {
           throw new BadRequestException(
             `Event for ticket "${ticket.name}" is not available for booking`,
           );
         }
 
-        if (ticket.event.startDate <= now) {
+        if (event.startDate <= now) {
           throw new BadRequestException(
             `Event for ticket "${ticket.name}" has already started`,
           );
