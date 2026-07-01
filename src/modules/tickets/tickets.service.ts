@@ -19,6 +19,13 @@ export class GetMyTicketsQueryDto {
   limit?: number = 20;
 }
 
+export interface GeneratedTicketInfo {
+  id: string;
+  ticketNumber: string;
+  ticketType: string;
+  seatInfo?: string;
+}
+
 @Injectable()
 export class TicketsService {
   private readonly logger = new Logger(TicketsService.name);
@@ -65,7 +72,6 @@ export class TicketsService {
     }> = [];
 
     for (const item of order.items) {
-      // ✅ Fail Fast — لا نُكمل لو eventId غير متاح
       if (!item.ticketType?.eventId) {
         throw new InternalServerErrorException(
           `Cannot resolve eventId for order item ${item.id}`,

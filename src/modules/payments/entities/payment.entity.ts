@@ -13,14 +13,14 @@ export class Payment extends BaseEntity {
   @Column({ name: 'order_id' })
   orderId: string;
 
-  @Column()
+  // ── Provider info ──────────────────────────────────────────────────────
+  @Column({ default: 'stripe' })
   provider: string;
 
   @Column({
     type: 'decimal',
     precision: 10,
     scale: 2,
-    // ✅ MySQL 8 يُرجع DECIMAL كـ string — transformer يحوّله تلقائياً
     transformer: {
       to: (v: number) => v,
       from: (v: string) => Number(v),
@@ -28,10 +28,7 @@ export class Payment extends BaseEntity {
   })
   amount: number;
 
-  @Column({
-    type: 'varchar',
-    length: 3,
-  })
+  @Column({ type: 'varchar', length: 3 })
   currency: string;
 
   @Column({
@@ -41,6 +38,21 @@ export class Payment extends BaseEntity {
   })
   status: PaymentStatus;
 
+  // ── Stripe fields ──────────────────────────────────────────────────────
+
+  /** Stripe PaymentIntent ID — pi_xxxxxx */
+  @Index()
   @Column({ name: 'provider_payment_id', nullable: true })
   providerPaymentId: string;
+
+  @Column({
+    name: 'client_secret',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  clientSecret: string | null;
+
+  @Column({ name: 'failure_reason', type: 'text', nullable: true })
+  failureReason: string | null;
 }

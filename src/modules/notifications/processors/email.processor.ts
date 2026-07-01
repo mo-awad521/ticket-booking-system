@@ -11,6 +11,7 @@ import {
   OrderConfirmationPayload,
   TicketGeneratedPayload,
   EventCancelledPayload,
+  TicketConfirmationPayload,
 } from '../interfaces/email-jobs.interface';
 
 @Processor(EMAIL_QUEUE, { concurrency: 5 })
@@ -43,6 +44,26 @@ export class EmailProcessor extends WorkerHost {
         return this.handleTicketGenerated(job.data as TicketGeneratedPayload);
       case EmailJob.EVENT_CANCELLED:
         return this.handleEventCancelled(job.data as EventCancelledPayload);
+      case EmailJob.TICKET_CONFIRMATION: {
+        const data = job.data as TicketConfirmationPayload;
+
+        const html = this.templateService.render('ticket-confirmation', {
+          to: data.to,
+          eventName: data.eventName,
+          ticketCount: data.ticketCount,
+        });
+
+        await this.emailService.send({
+          to: data.to,
+          subject: `🎟️ your tickets ready — ${data.eventName}`,
+          html,
+        });
+
+        this.logger.log(
+          `Ticket confirmation sent → ${data.to} | ${data.ticketCount} tickets`,
+        );
+        break;
+      }
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
     }

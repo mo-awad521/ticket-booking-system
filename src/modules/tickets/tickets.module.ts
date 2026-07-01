@@ -11,6 +11,7 @@ import { QrCodeService } from './services/qr-code.service';
 import { TicketSignatureService } from './services/ticket-signature.service';
 import { TicketValidationService } from './services/ticket-validation.service';
 import { EventStaffAssignment } from '../events/entities/event-staff-assignment.entity';
+import { PaymentSucceededListener } from './listeners/payment-succeeded.listener';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { EventStaffAssignment } from '../events/entities/event-staff-assignment.
     QrCodeService,
     TicketSignatureService,
     TicketValidationService,
+    PaymentSucceededListener,
   ],
 
   exports: [TicketsService],

@@ -28,6 +28,31 @@ export interface TicketGeneratedPayload {
   ticketCount: number;
 }
 
+// TicketItem داخل كل تذكرة
+export interface TicketItemPayload {
+  ticketNumber: string;
+  ticketType: string;
+  seatInfo?: string;
+  qrCodeUrl: string; // URL جاهز لـ <img src="...">
+}
+
+// الـ payload الكامل للإيميل
+export interface TicketConfirmationPayload {
+  to: string; // إيميل المستخدم
+  userName: string;
+  eventName: string;
+  eventDate: string; // "الجمعة، ١٥ يناير ٢٠٢٦"
+  eventTime: string; // "٨:٠٠ مساءً"
+  venueName: string;
+  venueAddress?: string;
+  tickets: TicketItemPayload[];
+  ticketCount: number;
+  orderId: string;
+  totalAmount: string; // "150.00"
+  currency: string; // "SAR"
+  currentYear: number;
+}
+
 export interface EventCancelledPayload {
   to: string;
   name: string;
@@ -41,4 +66,6 @@ export type EmailPayload =
   | PasswordResetPayload
   | OrderConfirmationPayload
   | TicketGeneratedPayload
-  | EventCancelledPayload;
+  | EventCancelledPayload
+  | TicketConfirmationPayload
+  | TicketItemPayload;

@@ -7,6 +7,9 @@ export class TicketResponseDto {
   status: string;
   orderId: string;
   ticketTypeId: string;
+  ticketNumber: any;
+  ticketType: any;
+  seatInfo: any;
 
   constructor(ticket: Ticket) {
     this.id = ticket.id;

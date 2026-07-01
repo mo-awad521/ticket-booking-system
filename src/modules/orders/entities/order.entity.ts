@@ -53,4 +53,5 @@ export class Order extends BaseEntity {
 
   @Column({ type: 'timestamp' })
   expiresAt: Date;
+  event: any;
 }

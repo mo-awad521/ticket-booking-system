@@ -8,6 +8,7 @@ import {
   OrderConfirmationPayload,
   TicketGeneratedPayload,
   EventCancelledPayload,
+  TicketConfirmationPayload,
 } from '../interfaces/email-jobs.interface';
 
 const DEFAULT_JOB_OPTIONS = {
@@ -48,6 +49,17 @@ export class NotificationQueueService {
 
   async sendEventCancelled(payload: EventCancelledPayload): Promise<void> {
     await this.enqueue(EmailJob.EVENT_CANCELLED, payload, { priority: 1 });
+  }
+
+  async notifyTicketConfirmation(
+    payload: TicketConfirmationPayload,
+  ): Promise<void> {
+    await this.emailQueue.add(EmailJob.TICKET_CONFIRMATION, payload, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5_000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+    });
   }
 
   private async enqueue(

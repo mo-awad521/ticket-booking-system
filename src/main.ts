@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -6,7 +7,13 @@ import { GlobalExceptionFilter } from './common/interceptors/http-exception.filt
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true,
+    logger:
+      process.env.NODE_ENV === 'production'
+        ? ['error', 'warn', 'log']
+        : ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Ticket Booking System')
@@ -39,4 +46,8 @@ async function bootstrap() {
   });
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+  console.error('Bootstrap failed:', err);
+  process.exit(1);
+});

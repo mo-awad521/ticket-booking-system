@@ -6,6 +6,7 @@ export const EmailJob = {
   ORDER_CONFIRMATION: 'send-order-confirmation',
   TICKET_GENERATED: 'send-ticket-generated',
   EVENT_CANCELLED: 'send-event-cancelled',
+  TICKET_CONFIRMATION: 'ticket.confirmation',
 } as const;
 
 export type EmailJobName = (typeof EmailJob)[keyof typeof EmailJob];

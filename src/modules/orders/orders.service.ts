@@ -13,6 +13,7 @@ import { OrderResponseDto } from './dtos/order-response.dto';
 import { OrderItem } from './entities/order-item.entity';
 import { Order } from './entities/order.entity';
 import { OrderStatus } from './enums/order-status.enum';
+import { ReservationItem } from '../reservations/entities/reservation-item.entity';
 
 @Injectable()
 export class OrdersService {
@@ -25,12 +26,15 @@ export class OrdersService {
   /*                              Create Order                                  */
   /* -------------------------------------------------------------------------- */
 
+  // orders.service.ts
+
   async createOrder(
     userId: string,
     dto: CreateOrderDto,
   ): Promise<OrderResponseDto> {
     return this.dataSource.transaction(async (manager) => {
       const reservationRepo = manager.getRepository(Reservation);
+      const reservationItemRepo = manager.getRepository(ReservationItem);
       const orderRepo = manager.getRepository(Order);
       const orderItemRepo = manager.getRepository(OrderItem);
       const ticketRepo = manager.getRepository(TicketType);
@@ -41,7 +45,6 @@ export class OrdersService {
           userId,
           status: ReservationStatus.ACTIVE,
         },
-        relations: ['items'],
         lock: { mode: 'pessimistic_write' },
       });
 
@@ -53,11 +56,17 @@ export class OrdersService {
         throw new BadRequestException('Reservation has expired');
       }
 
-      if (!reservation.items.length) {
+      // ── Step 2: Fetch items منفصلاً (نفس الـ transaction) ────────────────
+      const items = await reservationItemRepo.find({
+        where: { reservationId: reservation.id },
+      });
+
+      if (!items.length) {
         throw new BadRequestException('Reservation is empty');
       }
 
-      const ticketIds = reservation.items.map((i) => i.ticketTypeId);
+      // ── Step 3: Lock ticket types
+      const ticketIds = items.map((i) => i.ticketTypeId);
 
       const tickets = await ticketRepo
         .createQueryBuilder('t')
@@ -69,15 +78,14 @@ export class OrdersService {
         throw new NotFoundException('One or more ticket types not found');
       }
 
+      // ── Step 4: Build order ───────────────────────────────────────────────
       const ticketMap = new Map(tickets.map((t) => [t.id, t]));
-
       let total = 0;
       const orderItemsData: Partial<OrderItem>[] = [];
 
-      for (const item of reservation.items) {
+      for (const item of items) {
         const ticket = ticketMap.get(item.ticketTypeId)!;
         const price = Number(ticket.price);
-
         total += price * item.quantity;
 
         orderItemsData.push({
@@ -89,42 +97,40 @@ export class OrdersService {
 
       const ttl = this.config.get<number>('ORDER_TTL_MINUTES', 15);
 
-      const order = orderRepo.create({
-        userId,
-        status: OrderStatus.PENDING,
-        currency: 'USD',
-        totalAmount: total,
-        expiresAt: new Date(Date.now() + ttl * 60 * 1000),
-      });
-
-      const savedOrder = await orderRepo.save(order);
-
-      const items = orderItemRepo.create(
-        orderItemsData.map((i) => ({ ...i, orderId: savedOrder.id })),
+      const savedOrder = await orderRepo.save(
+        orderRepo.create({
+          userId,
+          status: OrderStatus.PENDING,
+          currency: 'USD',
+          totalAmount: total,
+          expiresAt: new Date(Date.now() + ttl * 60 * 1000),
+        }),
       );
 
-      const savedItems = await orderItemRepo.save(items);
+      const savedItems = await orderItemRepo.save(
+        orderItemRepo.create(
+          orderItemsData.map((i) => ({ ...i, orderId: savedOrder.id })),
+        ),
+      );
 
+      // ── Step 5: Update reservation status ─────────────────────────────────
       reservation.status = ReservationStatus.COMPLETED;
       await reservationRepo.save(reservation);
 
+      // ── Step 6: Update ticket quantities ──────────────────────────────────
       const ticketsToUpdate: TicketType[] = [];
 
-      for (const item of reservation.items) {
+      for (const item of items) {
         const ticket = ticketMap.get(item.ticketTypeId)!;
-
         ticket.reservedQuantity -= item.quantity;
         ticket.soldQuantity += item.quantity;
-
         if (ticket.reservedQuantity < 0) ticket.reservedQuantity = 0;
-
         ticketsToUpdate.push(ticket);
       }
 
       await ticketRepo.save(ticketsToUpdate);
 
       savedOrder.items = savedItems;
-
       return new OrderResponseDto(savedOrder);
     });
   }
