@@ -119,19 +119,34 @@
             the entrance to check in.
           </p>
 
-          <div class='event-card'>
-            <p class='event-title'>{{eventTitle}}</p>
-            <div class='event-meta'>
-              <div class='event-row'>📅 <span>{{eventDate}}</span></div>
-              <div class='event-row'>📍 <span>{{eventLocation}}</span></div>
-            </div>
-            <div class='count-pill'>{{ticketCount}}
-              ticket{{#if (gt ticketCount 1)}}s{{/if}}</div>
-          </div>
+<div class="event-card">
+  <p class="event-title">{{eventTitle}}</p>
+  <div class="event-meta">
+    <div class="event-row">📅 <span>{{eventDate}}</span></div>
+    <div class="event-row">📍 <span>{{eventLocation}}</span></div>
+  </div>
+</div>
 
-          <p class='cta-text'>
-            Log in to your account to view and download your QR codes anytime.
-          </p>
+{{#each tickets}}
+<div style="border:2px dashed #d4d4d8;border-radius:10px;padding:16px;
+            margin-bottom:12px;display:flex;align-items:center;
+            justify-content:space-between;background:#fff;">
+  <div>
+    <p style="margin:0 0 4px;font-size:11px;color:#a1a1aa;
+              letter-spacing:1px;">TICKET CODE</p>
+    <p style="margin:0;font-size:16px;font-weight:700;
+              font-family:monospace;letter-spacing:2px;color:#18181b;">
+      {{code}}
+    </p>
+  </div>
+  <img src="{{qrCodeUrl}}" width="110" height="110"
+       alt="QR-{{code}}" style="border-radius:8px;" />
+</div>
+{{/each}}
+
+<p class="cta-text">
+  Log in to your account to view and download your QR codes anytime.
+</p>
 
           <p class='note'>
             Each ticket has a unique QR code — please do not share screenshots.

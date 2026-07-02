@@ -26,30 +26,29 @@ export interface TicketGeneratedPayload {
   eventDate: string;
   eventLocation: string;
   ticketCount: number;
+  tickets: Array<{ code: string; qrCodeUrl: string }>;
 }
 
-// TicketItem داخل كل تذكرة
 export interface TicketItemPayload {
   ticketNumber: string;
   ticketType: string;
   seatInfo?: string;
-  qrCodeUrl: string; // URL جاهز لـ <img src="...">
+  qrCodeUrl: string;
 }
 
-// الـ payload الكامل للإيميل
 export interface TicketConfirmationPayload {
-  to: string; // إيميل المستخدم
+  to: string;
   userName: string;
   eventName: string;
-  eventDate: string; // "الجمعة، ١٥ يناير ٢٠٢٦"
-  eventTime: string; // "٨:٠٠ مساءً"
+  eventDate: string;
+  eventTime: string;
   venueName: string;
   venueAddress?: string;
   tickets: TicketItemPayload[];
   ticketCount: number;
   orderId: string;
-  totalAmount: string; // "150.00"
-  currency: string; // "SAR"
+  totalAmount: string;
+  currency: string;
   currentYear: number;
 }
 

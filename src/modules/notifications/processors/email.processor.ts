@@ -121,6 +121,7 @@ export class EmailProcessor extends WorkerHost {
       eventDate: p.eventDate,
       eventLocation: p.eventLocation,
       ticketCount: p.ticketCount,
+      tickets: p.tickets,
     });
     await this.emailService.send({
       to: p.to,
