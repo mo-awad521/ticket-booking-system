@@ -51,11 +51,11 @@ async function bootstrap() {
     .addTag('Tickets', 'QR ticket issuance and retrieval')
     .addTag('Scanner', 'Event-staff ticket check-in')
     .addTag('Analytics', 'Per-event stats & realtime updates')
-    .addTag(
-      'Admin',
-      'Admin panel: users, events, orders, tickets, stats, audit logs',
-    )
     .build();
+    //     .addTag(
+    //   'Admin',
+    //   'Admin panel: users, events, orders, tickets, stats, audit logs',
+    // )
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document, {
