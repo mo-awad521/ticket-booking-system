@@ -1,24 +1,35 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TicketType } from '../entities/ticket-type.entity';
 
 export class TicketTypeOwnerResponseDto {
+  @ApiProperty()
   id: string;
 
+  @ApiProperty()
   name: string;
 
+  @ApiProperty()
   price: number;
 
+  @ApiProperty()
   quantity: number;
 
+  @ApiProperty()
   soldQuantity: number;
 
+  @ApiProperty()
   reservedQuantity: number;
 
+  @ApiProperty()
   availableQuantity: number;
 
+  @ApiProperty({ description: 'price * soldQuantity' })
   revenue: number;
 
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
   saleStart?: Date;
 
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
   saleEnd?: Date;
 
   constructor(ticket: TicketType) {

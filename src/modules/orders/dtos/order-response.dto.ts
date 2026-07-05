@@ -1,11 +1,19 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { OrderItem } from '../entities/order-item.entity';
 import { Order } from '../entities/order.entity';
 import { OrderStatus } from '../enums/order-status.enum';
 
 export class OrderItemResponseDto {
+  @ApiProperty()
   ticketTypeId: string;
+
+  @ApiProperty()
   quantity: number;
+
+  @ApiProperty({ description: 'Price snapshot at order creation time' })
   unitPrice: number;
+
+  @ApiProperty({ description: 'unitPrice * quantity' })
   subtotal: number;
 
   constructor(item: OrderItem) {
@@ -17,11 +25,22 @@ export class OrderItemResponseDto {
 }
 
 export class OrderResponseDto {
+  @ApiProperty()
   id: string;
+
+  @ApiProperty({ enum: OrderStatus })
   status: OrderStatus;
+
+  @ApiProperty()
   totalAmount: number;
+
+  @ApiProperty({ example: 'USD' })
   currency: string;
+
+  @ApiProperty({ type: String, format: 'date-time' })
   expiresAt: Date;
+
+  @ApiProperty({ type: [OrderItemResponseDto] })
   items: OrderItemResponseDto[];
 
   constructor(order: Order) {

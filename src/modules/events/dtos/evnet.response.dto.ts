@@ -1,17 +1,41 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Event } from '../entities/event.entity';
 
 export class EventResponseDto {
+  @ApiProperty()
   id: string;
+
+  @ApiProperty()
   title: string;
+
+  @ApiProperty()
   slug: string;
+
+  @ApiPropertyOptional()
   description?: string;
+
+  @ApiProperty()
   location: string;
+
+  @ApiPropertyOptional()
   imageUrl?: string;
+
+  @ApiProperty({ type: String, format: 'date-time' })
   startDate: Date;
+
+  @ApiProperty({ type: String, format: 'date-time' })
   endDate: Date;
+
+  @ApiProperty()
   status: string;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   publishedAt?: Date | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
   createdAt: Date;
+
+  @ApiProperty({ type: String, format: 'date-time' })
   updatedAt: Date;
 
   constructor(event: Event) {
