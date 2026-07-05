@@ -14,14 +14,14 @@ import { AdminTicketsService } from './services/admin-tickets.service';
 import { AdminAuditLogService } from './services/admin-audit-log.service';
 import { AdminExportService } from './services/admin-export.service';
 import { AdminFacadeService } from './services/admin-facade.service';
-import {
-  AdminUsersController,
-  AdminEventsController,
-  AdminOrdersController,
-  AdminTicketsController,
-  AdminStatsController,
-  AdminAuditLogController,
-} from './controllers/admin.controller';
+// import {
+//   AdminUsersController,
+//   AdminEventsController,
+//   AdminOrdersController,
+//   AdminTicketsController,
+//   AdminStatsController,
+//   AdminAuditLogController,
+// } from './controllers/admin.controller';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // admin/admin.module.ts
@@ -36,14 +36,14 @@ import {
     TypeOrmModule.forFeature([User, Event, Order, Ticket, AdminAuditLog]),
   ],
 
-  controllers: [
-    AdminUsersController, // /admin/users/*
-    AdminEventsController, // /admin/events/*
-    AdminOrdersController, // /admin/orders/*
-    AdminTicketsController, // /admin/tickets/*
-    AdminStatsController, // /admin/stats/*
-    AdminAuditLogController, // /admin/audit-logs/*
-  ],
+  // controllers: [
+  //   AdminUsersController, // /admin/users/*
+  //   AdminEventsController, // /admin/events/*
+  //   AdminOrdersController, // /admin/orders/*
+  //   AdminTicketsController, // /admin/tickets/*
+  //   AdminStatsController, // /admin/stats/*
+  //   AdminAuditLogController, // /admin/audit-logs/*
+  // ],
 
   providers: [
     // ── Domain Services (SRP) ──────────────────────────────

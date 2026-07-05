@@ -17,7 +17,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { AdminModule } from './modules/admin/admin.module';
+//import { AdminModule } from './modules/admin/admin.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
 import { BullBoardModule } from '@bull-board/nestjs';
@@ -91,7 +91,7 @@ import { AppCacheModule } from './common/cache/cache.module';
     PaymentsModule,
     TicketsModule,
     AnalyticsModule,
-    AdminModule,
+    //AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
