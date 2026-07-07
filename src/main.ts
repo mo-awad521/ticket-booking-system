@@ -25,7 +25,7 @@ async function bootstrap() {
         '`{ success, statusCode, message, data, timestamp, path }`.',
     )
     .setVersion('1.0.0')
-    .setContact('Mohammad Alawad', 'https://github.com/mo-awad521', '')
+    .setContact('Mohammad Alawad', 'https://github.com/mo-awad521', 'Github')
     .addServer('https://myticket-ly.me', 'Production (Render)')
     .addServer('http://localhost:5000', 'Local Development')
     .addBearerAuth(
@@ -52,10 +52,10 @@ async function bootstrap() {
     .addTag('Scanner', 'Event-staff ticket check-in')
     .addTag('Analytics', 'Per-event stats & realtime updates')
     .build();
-    //     .addTag(
-    //   'Admin',
-    //   'Admin panel: users, events, orders, tickets, stats, audit logs',
-    // )
+  //     .addTag(
+  //   'Admin',
+  //   'Admin panel: users, events, orders, tickets, stats, audit logs',
+  // )
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document, {
