@@ -38,21 +38,25 @@ export class ReservationsService {
       const ticketsToUpdate: TicketType[] = [];
       const itemsToSave: Partial<ReservationItem>[] = [];
       const now = new Date();
-
+      const t1 = Date.now();
       for (const item of mergedItems) {
         const ticket = await ticketRepo.findOne({
           where: { id: item.ticketTypeId },
           lock: { mode: 'pessimistic_write' },
         });
+        console.log(`Time taken to fetch ticket: ${Date.now() - t1}ms`);
 
         if (!ticket) {
           throw new NotFoundException(
             `Ticket type ${item.ticketTypeId} not found`,
           );
         }
+
+        const t2 = Date.now();
         const event = await manager.getRepository(Event).findOne({
           where: { id: ticket.eventId },
         });
+        console.log('event:', Date.now() - t2, 'ms');
 
         if (!event) {
           throw new NotFoundException('Event not found');
@@ -108,11 +112,13 @@ export class ReservationsService {
         expiresAt: new Date(Date.now() + expirationMinutes * 60 * 1000),
         status: ReservationStatus.ACTIVE,
       });
-
+      const t3 = Date.now();
       const savedReservation = await reservationRepo.save(reservation);
+      console.log(`Time taken to save reservation: ${Date.now() - t3}ms`);
 
+      const t4 = Date.now();
       await ticketRepo.save(ticketsToUpdate);
-
+      console.log(`Time taken to save tickets: ${Date.now() - t4}ms`);
       const items = reservationItemRepo.create(
         itemsToSave.map((i) => ({
           ...i,
