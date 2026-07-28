@@ -64,7 +64,6 @@ export class TicketValidationService {
       const ticket = await ticketRepo.findOne({
         where: { code: ticketCode },
         lock: { mode: 'pessimistic_write' },
-        relations: ['ticketType'],
       });
 
       if (!ticket) {
@@ -83,11 +82,13 @@ export class TicketValidationService {
           ticket.status === TicketStatus.USED
             ? 'Ticket already used'
             : 'Ticket is not valid';
+
         throw new BadRequestException(message);
       }
 
       ticket.status = TicketStatus.USED;
       ticket.usedAt = new Date();
+
       await ticketRepo.save(ticket);
 
       this.logger.log(
