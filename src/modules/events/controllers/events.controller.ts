@@ -84,6 +84,16 @@ export class EventsController {
     return this.eventsService.findById(id);
   }
 
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER)
+  @Get('my/:id')
+  @ApiOperation({ summary: 'Get a single Event' })
+  @ApiStandardResponse({ model: EventResponseDto })
+  async findMyEvent(@Param('id') id: string) {
+    return this.eventsService.findMyEvent(id);
+  }
+
   /* -------------------------------------------------------------------------- */
   /*                          ORGANIZER ENDPOINTS                               */
   /* -------------------------------------------------------------------------- */

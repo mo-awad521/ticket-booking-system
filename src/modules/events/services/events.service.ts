@@ -127,6 +127,18 @@ export class EventsService {
     );
   }
 
+  async findMyEvent(eventId: string) {
+    return this.cacheService.wrap(
+      CacheKey.eventById(eventId),
+      async () => {
+        const event = await this.eventRepo.findOne({ where: { id: eventId } });
+        if (!event) throw new NotFoundException('Event not found');
+        return new EventResponseDto(event);
+      },
+      CacheTTL.EVENT_DETAIL,
+    );
+  }
+
   private async fetchOrganizerEvents(
     userId: string,
     query: OrganizerEventsQueryDto,
